@@ -1,0 +1,184 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Centralized LotusX Design Tokens */
+  --color-primary: var(--color-primary, #08BBD4);
+  --color-primary-dark: var(--color-primary-dark, #0797AD);
+  --color-primary-hover: var(--color-primary-hover, #0797AD);
+  --color-primary-light: var(--color-primary-light, #39CBE0);
+  --color-primary-subtle: var(--color-primary-subtle, rgba(8, 187, 212, 0.08));
+  --color-primary-muted: var(--color-primary-muted, rgba(8, 187, 212, 0.16));
+
+  --color-secondary: var(--color-secondary, #062A63);
+  --color-dark-navy: var(--color-dark-navy, #03152F);
+  --color-accent: var(--color-accent, #08BBD4);
+
+  --color-bg-app: var(--color-bg-app, #F5F8FC);
+  --color-bg-secondary: var(--color-bg-secondary, #EDF3F9);
+  --color-bg-surface: var(--color-bg-surface, #FFFFFF);
+  --color-bg-elevated: var(--color-bg-elevated, #FFFFFF);
+
+  --color-text-primary: var(--color-text-primary, #10233F);
+  --color-text-secondary: var(--color-text-secondary, #53657A);
+  --color-text-muted: var(--color-text-muted, #8493A5);
+  --color-border: var(--color-border, #DCE5EF);
+
+  --color-success: var(--color-success, #16A56B);
+  --color-warning: var(--color-warning, #E6A23C);
+  --color-error: var(--color-error, #D64545);
+  --color-info: var(--color-info, #3B82C4);
+}
+
+/* Custom CSS properties default definition (Light Mode) */
+:root {
+  color-scheme: light;
+  --color-primary: #08BBD4;
+  --color-primary-rgb: 8, 187, 212;
+  --color-primary-hover: #0797AD;
+  --color-primary-dark: #0797AD;
+  --color-primary-light: #39CBE0;
+  --color-primary-subtle: rgba(8, 187, 212, 0.08);
+  --color-primary-muted: rgba(8, 187, 212, 0.16);
+
+  --color-secondary: #062A63;
+  --color-secondary-rgb: 6, 42, 99;
+  --color-dark-navy: #03152F;
+
+  --color-accent: #08BBD4;
+  --color-accent-rgb: 8, 187, 212;
+
+  --color-bg-app: #F5F8FC;
+  --color-bg-secondary: #EDF3F9;
+  --color-bg-surface: #FFFFFF;
+  --color-bg-elevated: #FFFFFF;
+
+  --color-text-primary: #10233F;
+  --color-text-secondary: #53657A;
+  --color-text-muted: #8493A5;
+  --color-border: #DCE5EF;
+
+  --color-success: #16A56B;
+  --color-warning: #E6A23C;
+  --color-error: #D64545;
+  --color-info: #3B82C4;
+}
+
+/* Dark Mode Token Overrides */
+html.dark {
+  color-scheme: dark;
+  --color-primary: #08BBD4;
+  --color-primary-rgb: 8, 187, 212;
+  --color-primary-hover: #0797AD;
+  --color-primary-dark: #0797AD;
+
+  --color-secondary: #062A63;
+  --color-secondary-rgb: 6, 42, 99;
+  --color-dark-navy: #03152F;
+
+  --color-bg-app: #061426;
+  --color-bg-secondary: #0B1F38;
+  --color-bg-surface: #0D223D;
+  --color-bg-elevated: #112B4A;
+
+  --color-text-primary: #F5F9FF;
+  --color-text-secondary: #B8C6D8;
+  --color-text-muted: #8493A5;
+  --color-border: #1D3855;
+
+  --color-success: #16A56B;
+  --color-warning: #E6A23C;
+  --color-error: #D64545;
+  --color-info: #3B82C4;
+}
+
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  font-family: var(--font-sans);
+  background-color: var(--color-bg-app);
+  color: var(--color-text-primary);
+}
+
+/* Reusable Centralized LotusX Button System */
+.btn-primary {
+  background-color: var(--color-primary);
+  color: #FFFFFF;
+  font-weight: 600;
+  transition: background-color 150ms ease, border-color 150ms ease, opacity 150ms ease;
+}
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--color-primary-dark);
+}
+.btn-primary:active:not(:disabled) {
+  background-color: var(--color-primary-dark);
+}
+
+.btn-secondary {
+  background-color: var(--color-secondary);
+  color: #FFFFFF;
+  font-weight: 600;
+  transition: background-color 150ms ease, border-color 150ms ease, opacity 150ms ease;
+}
+.btn-secondary:hover:not(:disabled) {
+  background-color: #08357A;
+}
+.btn-secondary:active:not(:disabled) {
+  background-color: var(--color-dark-navy);
+}
+
+.btn-outline {
+  background-color: transparent;
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary-dark);
+  font-weight: 600;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+html.dark .btn-outline {
+  color: var(--color-primary);
+}
+.btn-outline:hover:not(:disabled) {
+  background-color: var(--color-primary-subtle);
+}
+
+.btn-danger {
+  background-color: var(--color-error);
+  color: #FFFFFF;
+  font-weight: 600;
+  transition: background-color 150ms ease, opacity 150ms ease;
+}
+.btn-danger:hover:not(:disabled) {
+  background-color: #B83737;
+}
+
+/* Safe area inset utilities for mobile devices */
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 1rem));
+}
+
+.pt-safe {
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0.5rem));
+}
+
+/* Mobile touch target minimum sizing helper */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Hide scrollbar for clean horizontal tab bars while maintaining touch scroll */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+::selection {
+  background-color: var(--color-primary);
+  color: #ffffff;
+}

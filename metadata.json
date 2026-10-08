@@ -1,0 +1,10 @@
+{
+  "name": "LotusX",
+  "description": "A zero-knowledge, local-first encrypted password manager and secure credential vault.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

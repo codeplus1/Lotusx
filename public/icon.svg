@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Upper Sky Cyan-Blue Gradient -->
+    <linearGradient id="upperGrad" x1="15%" y1="0%" x2="85%" y2="85%">
+      <stop offset="0%" stop-color="#2CE8FA" />
+      <stop offset="35%" stop-color="#08BBD4" />
+      <stop offset="75%" stop-color="#0677B8" />
+      <stop offset="100%" stop-color="#06539A" />
+    </linearGradient>
+
+    <!-- Lower Deep Navy Shield Hill Gradient -->
+    <linearGradient id="lowerNavyGrad" x1="50%" y1="30%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#053582" />
+      <stop offset="50%" stop-color="#062A63" />
+      <stop offset="100%" stop-color="#03152F" />
+    </linearGradient>
+
+    <!-- Shackle Vertical Gradient -->
+    <linearGradient id="shackleGrad" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="70%" stop-color="#F2FAFE" />
+      <stop offset="100%" stop-color="#BCE9F7" />
+    </linearGradient>
+
+    <!-- Arch Ridge Gradient -->
+    <linearGradient id="archGrad" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#D4F2FC" />
+      <stop offset="50%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#C8ECFA" />
+    </linearGradient>
+
+    <!-- Soft Shadow for Keyhole and Shackle -->
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#020E24" flood-opacity="0.38" />
+    </filter>
+
+    <!-- Squircle Clip Path -->
+    <clipPath id="squircleClip">
+      <rect x="0" y="0" width="512" height="512" rx="116" ry="116" />
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#squircleClip)">
+    <!-- 1. Upper Vibrant Cyan-Blue Background -->
+    <rect x="0" y="0" width="512" height="512" fill="url(#upperGrad)" />
+
+    <!-- Subtle top-left gloss highlight -->
+    <ellipse cx="140" cy="90" rx="220" ry="140" fill="#5DF3FF" opacity="0.18" />
+
+    <!-- 2. Padlock Shackle (White U-Arch behind the curved horizon) -->
+    <path
+      d="M 182 260 L 182 190 A 74 74 0 0 1 330 190 L 330 260"
+      fill="none"
+      stroke="url(#shackleGrad)"
+      stroke-width="36"
+      stroke-linecap="butt"
+      filter="url(#softShadow)"
+    />
+
+    <!-- 3. Lower Deep Navy Curved Mound -->
+    <path
+      d="M -20 335 C 110 250, 185 216, 256 216 C 327 216, 402 250, 532 335 L 532 532 L -20 532 Z"
+      fill="url(#lowerNavyGrad)"
+    />
+
+    <!-- 4. Crisp White Curved Horizon Ridge -->
+    <path
+      d="M -20 335 C 110 250, 185 216, 256 216 C 327 216, 402 250, 532 335"
+      fill="none"
+      stroke="url(#archGrad)"
+      stroke-width="24"
+      stroke-linecap="round"
+      filter="url(#softShadow)"
+    />
+
+    <!-- 5. Iconic White Keyhole in Center of Deep Navy Section -->
+    <g filter="url(#softShadow)">
+      <circle cx="256" cy="292" r="28" fill="#FFFFFF" />
+      <path
+        d="M 241 308 L 271 308 L 284 378 C 284.5 381 282 384 279 384 L 233 384 C 230 384 227.5 381 228 378 Z"
+        fill="#FFFFFF"
+      />
+    </g>
+  </g>
+</svg>
