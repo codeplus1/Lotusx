@@ -13,17 +13,17 @@ export const DashboardSkeleton: React.FC = () => {
       aria-label="Loading Security Command Center"
       className="space-y-6 max-w-7xl mx-auto animate-pulse"
     >
-      {/* Top Banner Skeleton */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-bg-surface p-6 rounded-xl border border-border shadow-xs">
-        <div className="space-y-2.5 flex-1">
-          <div className="h-3.5 w-48 bg-bg-secondary rounded-md" />
-          <div className="h-7 w-64 bg-bg-secondary rounded-lg" />
-          <div className="h-3.5 w-80 max-w-full bg-bg-secondary rounded-md" />
+      {/* Top Unified Banner & Search Skeleton */}
+      <div className="bg-bg-surface p-5 sm:p-6 rounded-xl border border-border shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+          <div className="h-7 w-36 bg-bg-secondary rounded-lg" />
+          <div className="grid grid-cols-2 sm:flex items-center gap-2.5">
+            <div className="h-10 w-full sm:w-36 bg-bg-secondary rounded-xl" />
+            <div className="h-10 w-full sm:w-36 bg-primary/20 rounded-xl" />
+          </div>
         </div>
-
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-36 bg-bg-secondary rounded-lg" />
-          <div className="h-10 w-36 bg-primary/20 rounded-lg" />
+        <div className="pt-3.5 border-t border-border/70">
+          <div className="h-10 w-full bg-bg-secondary rounded-xl" />
         </div>
       </div>
 

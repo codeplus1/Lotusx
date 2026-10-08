@@ -42,12 +42,7 @@ export const SecurityCenterView: React.FC = () => {
   const score = securityReport.overallScore;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
-      className="space-y-6 max-w-6xl mx-auto"
-    >
+    <div className="space-y-6 max-w-6xl mx-auto">
       {/* Top Hero Score Card */}
       <div className="bg-[#03152F] text-white rounded-xl p-6 sm:p-8 border border-[#1D3855] flex flex-col md:flex-row items-center justify-between gap-6 shadow-xs">
         <div className="space-y-2 text-center md:text-left">
@@ -216,6 +211,6 @@ export const SecurityCenterView: React.FC = () => {
           </div>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 };

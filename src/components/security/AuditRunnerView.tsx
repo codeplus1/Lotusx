@@ -37,12 +37,7 @@ export const AuditRunnerView: React.FC = () => {
   }, []);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
-      className="space-y-6 max-w-5xl mx-auto"
-    >
+    <div className="space-y-6 max-w-5xl mx-auto">
       {/* Header Card (Dark Navy Security Surface) */}
       <div className="bg-[#03152F] text-white p-6 sm:p-8 rounded-xl border border-[#1D3855] flex flex-col sm:flex-row sm:items-center justify-between gap-6 shadow-xs">
         <div className="space-y-2">
@@ -193,6 +188,6 @@ export const AuditRunnerView: React.FC = () => {
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 };

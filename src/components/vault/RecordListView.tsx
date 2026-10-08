@@ -20,6 +20,32 @@ import {
 import { useVault } from '../../context/VaultContext';
 import { CATEGORY_METADATA, VaultRecord } from '../../types/vault';
 
+const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const highlightMatch = (text: string | undefined, query: string): React.ReactNode => {
+  if (!text) return '';
+  const trimmed = query.trim();
+  if (!trimmed) return text;
+
+  const regex = new RegExp(`(${escapeRegExp(trimmed)})`, 'gi');
+  const parts = text.split(regex);
+
+  if (parts.length === 1) return text;
+
+  return parts.map((part, index) =>
+    part.toLowerCase() === trimmed.toLowerCase() ? (
+      <mark
+        key={index}
+        className="bg-primary/25 text-text-primary font-semibold rounded-xs px-0.5 border-b border-primary"
+      >
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+};
+
 export const RecordListView: React.FC = () => {
   const {
     filteredRecords,
@@ -144,13 +170,35 @@ export const RecordListView: React.FC = () => {
               const isSelected = selectedRecord?.id === rec.id;
               const isCopied = copiedFieldLabel === `quick-${rec.id}`;
               const isWeak = rec.password && (rec.strengthScore ?? 3) <= 1;
+              const q = searchQuery.trim().toLowerCase();
+
+              const matchedSecondaryField = q
+                ? [rec.username, rec.email, rec.bankName, rec.url, rec.website].find(
+                    (f) => f && f.toLowerCase().includes(q)
+                  )
+                : undefined;
+              const secondaryText =
+                matchedSecondaryField ||
+                rec.username ||
+                rec.email ||
+                rec.bankName ||
+                rec.url ||
+                rec.website ||
+                meta.label;
+
+              const sortedTags = q
+                ? [...rec.tags].sort((a, b) => {
+                    const aMatch = a.toLowerCase().includes(q) ? 0 : 1;
+                    const bMatch = b.toLowerCase().includes(q) ? 0 : 1;
+                    return aMatch - bMatch;
+                  })
+                : rec.tags;
 
               return (
-                <motion.div
-                  layout
+                <div
                   key={rec.id}
                   onClick={() => setSelectedRecord(rec)}
-                  className={`p-3.5 sm:px-5 sm:py-4 flex items-center justify-between gap-3 sm:gap-4 transition-all cursor-pointer ${
+                  className={`p-3.5 sm:px-5 sm:py-4 flex items-center justify-between gap-3 sm:gap-4 transition-colors cursor-pointer ${
                     isSelected
                       ? 'bg-primary/10 border-l-4 border-l-primary'
                       : 'hover:bg-bg-secondary/60'
@@ -165,7 +213,7 @@ export const RecordListView: React.FC = () => {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <h4 className="text-sm font-semibold text-text-primary truncate">
-                          {rec.title}
+                          {highlightMatch(rec.title, searchQuery)}
                         </h4>
                         {isWeak && (
                           <span
@@ -180,16 +228,16 @@ export const RecordListView: React.FC = () => {
 
                       <div className="flex items-center gap-2 text-xs text-text-secondary truncate mt-0.5">
                         <span className="truncate">
-                          {rec.username || rec.email || rec.bankName || rec.url || meta.label}
+                          {highlightMatch(secondaryText, searchQuery)}
                         </span>
-                        {rec.tags.length > 0 && (
+                        {sortedTags.length > 0 && (
                           <div className="hidden md:flex items-center gap-1">
-                            {rec.tags.slice(0, 2).map((t) => (
+                            {sortedTags.slice(0, 2).map((t) => (
                               <span
                                 key={t}
                                 className="px-1.5 py-0.2 rounded bg-bg-secondary text-text-secondary text-[10px] font-mono border border-border"
                               >
-                                #{t}
+                                #{highlightMatch(t, searchQuery)}
                               </span>
                             ))}
                           </div>
@@ -228,7 +276,7 @@ export const RecordListView: React.FC = () => {
                       </button>
                     )}
                   </div>
-                </motion.div>
+                </div>
               );
             })}
           </div>

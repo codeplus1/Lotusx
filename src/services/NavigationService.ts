@@ -57,7 +57,7 @@ class NavigationService {
         }
       }
 
-      const [action] = this.stack.splice(highestIdx, 1);
+      const action = this.stack[highestIdx];
       if (action && typeof action.onBack === 'function') {
         action.onBack();
       }
@@ -65,6 +65,14 @@ class NavigationService {
       // Allow synchronous unmount/unregister callbacks to complete before resetting
       setTimeout(() => {
         this.isBackPressActive = false;
+        if (this.stack.length > 0 && this.historyDepth === 0) {
+          try {
+            window.history.pushState({ lotusxBackSentinel: true }, '');
+            this.historyDepth = 1;
+          } catch {
+            // Ignore history push limits in iframe contexts
+          }
+        }
       }, 0);
     }
   };
@@ -82,16 +90,16 @@ class NavigationService {
       return;
     }
 
-    // Push new action to stack
+    const wasEmpty = this.stack.length === 0;
     this.stack.push(action);
 
-    // Synchronize browser history so Android system back button triggers popstate
-    if (this.stack.length > this.historyDepth) {
+    // Push a single sentinel history state only when transitioning from root to non-root
+    if (wasEmpty && this.historyDepth === 0) {
       try {
-        window.history.pushState({ lotusxDepth: this.stack.length, id: action.id }, '');
-        this.historyDepth++;
-      } catch (err) {
-        console.warn('[NavigationService] pushState failed:', err);
+        window.history.pushState({ lotusxBackSentinel: true }, '');
+        this.historyDepth = 1;
+      } catch {
+        // Ignore history push limits in iframe contexts
       }
     }
   }
@@ -119,18 +127,6 @@ class NavigationService {
     if (existingIdx < 0) return;
 
     this.stack.splice(existingIdx, 1);
-
-    // If unregister was caused by user pressing on-screen Close/Cancel button (not Android Back button)
-    // we must pop the corresponding browser history entry to avoid an empty dead back step.
-    if (!this.isBackPressActive && this.historyDepth > this.stack.length) {
-      this.isProgrammaticPop = true;
-      this.historyDepth = Math.max(0, this.historyDepth - 1);
-      try {
-        window.history.back();
-      } catch (err) {
-        console.warn('[NavigationService] history.back failed:', err);
-      }
-    }
   }
 
   /**

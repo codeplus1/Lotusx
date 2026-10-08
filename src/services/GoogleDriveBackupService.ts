@@ -201,7 +201,7 @@ export class GoogleDriveBackupService {
     const metadata = {
       name: fileName,
       mimeType: 'application/json',
-      description: 'LotusX Zero-Knowledge Encrypted Vault Backup (AES-256-GCM + Argon2id)',
+      description: 'LotusX Backup (AES-256-GCM + Argon2id)',
       appProperties: {
         app: 'LotusX',
         format: 'LOTUSX_AUTHENTICATED_BACKUP_V3',

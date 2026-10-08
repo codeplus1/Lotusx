@@ -161,7 +161,7 @@ const DetailRow: React.FC<DetailRowProps> = ({
 export const RecordDetailView: React.FC = () => {
   const {
     selectedRecord,
-    setSelectedRecord,
+    navigateBack,
     setEditingRecord,
     updateRecord,
     softDeleteRecord,
@@ -337,11 +337,8 @@ export const RecordDetailView: React.FC = () => {
   const customFieldsList = selectedRecord.customFields || [];
 
   return (
-    <motion.div
+    <div
       key={selectedRecord.id}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
       className="bg-bg-surface rounded-xl border border-border shadow-xs overflow-hidden"
     >
       {/* Top Header Bar */}
@@ -349,7 +346,7 @@ export const RecordDetailView: React.FC = () => {
         <div className="flex items-center gap-3.5 min-w-0">
           <button
             type="button"
-            onClick={() => setSelectedRecord(null)}
+            onClick={navigateBack}
             className="lg:hidden p-2 -ml-1 rounded-xl text-text-secondary hover:text-text-primary hover:bg-bg-surface border border-transparent hover:border-border cursor-pointer touch-target flex items-center justify-center shrink-0"
             aria-label="Back to list"
           >
@@ -1141,6 +1138,6 @@ export const RecordDetailView: React.FC = () => {
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 };

@@ -304,61 +304,51 @@ export const Sidebar: React.FC = () => {
       </aside>
 
       {/* Mobile Drawer (Visible on < lg when isMobileMenuOpen is true) */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <div className="lg:hidden fixed inset-0 z-50 flex">
-            {/* Backdrop Overlay */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.16 }}
-              className="fixed inset-0 bg-[#03152F]/75 backdrop-blur-xs"
-              onClick={() => setIsMobileMenuOpen(false)}
-              aria-hidden="true"
-            />
+      {isMobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          {/* Backdrop Overlay */}
+          <div
+            className="fixed inset-0 bg-[#03152F]/75"
+            onClick={() => setIsMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
 
-            {/* Slide-out Sidebar Panel */}
-            <motion.div
-              initial={{ x: '-100%' }}
-              animate={{ x: '0%' }}
-              exit={{ x: '-100%' }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="relative w-72 max-w-[85vw] bg-[#03152F] text-[#F5F9FF] flex flex-col shadow-xl z-10 h-full border-r border-[#1D3855]"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Sidebar Navigation Menu"
-            >
-              {/* Drawer Header */}
-              <div className="p-4 border-b border-[#1D3855] flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-[#062A63] border border-[#1D3855] text-[#08BBD4] flex items-center justify-center">
-                    <Shield className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="font-bold text-sm text-white tracking-tight">Vault Navigation</span>
-                    <p className="text-[10px] text-[#B8C6D8]">Local Encrypted Storage</p>
-                  </div>
+          {/* Slide-out Sidebar Panel */}
+          <div
+            className="relative w-72 max-w-[85vw] bg-[#03152F] text-[#F5F9FF] flex flex-col shadow-xl z-10 h-full border-r border-[#1D3855]"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Sidebar Navigation Menu"
+          >
+            {/* Drawer Header */}
+            <div className="p-4 border-b border-[#1D3855] flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#062A63] border border-[#1D3855] text-[#08BBD4] flex items-center justify-center">
+                  <Shield className="w-4 h-4" />
                 </div>
-                <button
-                  id="close-mobile-sidebar-btn"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2 text-[#B8C6D8] hover:text-white hover:bg-[#062A63] rounded-xl transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
-                  aria-label="Close sidebar"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div>
+                  <span className="font-bold text-sm text-white tracking-tight">Vault Navigation</span>
+                  <p className="text-[10px] text-[#B8C6D8]">Local Encrypted Storage</p>
+                </div>
               </div>
+              <button
+                id="close-mobile-sidebar-btn"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="p-2 text-[#B8C6D8] hover:text-white hover:bg-[#062A63] rounded-full transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
+                aria-label="Close sidebar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-              {/* Navigation Body */}
-              {renderNavList()}
+            {/* Navigation Body */}
+            {renderNavList()}
 
-              {/* Drawer Footer */}
-              {renderFooter()}
-            </motion.div>
+            {/* Drawer Footer */}
+            {renderFooter()}
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
     </>
   );
 };

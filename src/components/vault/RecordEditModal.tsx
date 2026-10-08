@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   KeyRound,
   RefreshCw,
@@ -68,6 +68,7 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    if (!isOpen) return;
     if (recordToEdit) {
       setTitle(recordToEdit.title);
       setCategory(recordToEdit.category);
@@ -189,7 +190,12 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
     }
   };
 
-  const strength = passwordGenerator.evaluateStrength(password);
+  const strength = useMemo(
+    () => (password ? passwordGenerator.evaluateStrength(password) : null),
+    [password]
+  );
+
+  if (!isOpen) return null;
 
   return (
     <Modal
@@ -213,7 +219,6 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
               placeholder="e.g., Chase Bank, GitHub Production, AWS Root"
               className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-bg-surface text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               required
-              autoFocus
             />
           </div>
 
@@ -298,7 +303,7 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
             </button>
           </div>
 
-          {password.length > 0 && (
+          {password.length > 0 && strength && (
             <div className="flex items-center justify-between text-xs pt-1">
               <span className="text-text-secondary">
                 Entropy: <strong className="font-mono text-text-primary">{strength.entropyBits} bits</strong>

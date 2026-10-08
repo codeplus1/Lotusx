@@ -63,6 +63,8 @@ interface VaultContextType {
 
   // Actions
   setActiveView: (view: AppView) => void;
+  navigateBack: () => void;
+  canGoBack: boolean;
   setActiveSettingsTab: (tab: string) => void;
   setSelectedCategory: (category: RecordCategory) => void;
   setSearchQuery: (query: string) => void;
@@ -124,7 +126,6 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [records, setRecords] = useState<VaultRecord[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [activeView, setActiveView] = useState<AppView>('dashboard');
-  const [viewHistory, setViewHistory] = useState<AppView[]>(['dashboard']);
   const [selectedCategory, setSelectedCategory] = useState<RecordCategory>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<SortOption>('updated_desc');
@@ -141,35 +142,146 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [detectedPasswordChange, setDetectedPasswordChange] = useState<DetectedPasswordChange | null>(null);
   const [activeSettingsTab, setActiveSettingsTab] = useState<string>('security');
 
-  const handleSetActiveView = useCallback((nextView: AppView) => {
-    setActiveView((currentView) => {
-      if (currentView === nextView) return currentView;
-      setViewHistory((prev) => {
-        if (nextView === 'dashboard') {
-          return ['dashboard'];
-        }
-        return [...prev, nextView];
-      });
-      return nextView;
+  const activeViewRef = useRef<AppView>('dashboard');
+  const selectedCategoryRef = useRef<RecordCategory>('all');
+  const selectedRecordRef = useRef<VaultRecord | null>(null);
+  const recordsRef = useRef<VaultRecord[]>([]);
+  recordsRef.current = records;
+
+  const navStackRef = useRef<Array<{ view: AppView; category: RecordCategory; recordId: string | null }>>([]);
+  const isBatchingNavRef = useRef<boolean>(false);
+  const didSetRecordInTickRef = useRef<boolean>(false);
+
+  const pushNavSnapshotOncePerTick = useCallback(() => {
+    if (isBatchingNavRef.current) return;
+    isBatchingNavRef.current = true;
+    navStackRef.current.push({
+      view: activeViewRef.current,
+      category: selectedCategoryRef.current,
+      recordId: selectedRecordRef.current?.id ?? null,
+    });
+    queueMicrotask(() => {
+      isBatchingNavRef.current = false;
+      didSetRecordInTickRef.current = false;
     });
   }, []);
 
+  const handleSetSelectedRecord = useCallback(
+    (nextRecord: VaultRecord | null) => {
+      if (nextRecord === null) {
+        if (selectedRecordRef.current !== null) {
+          selectedRecordRef.current = null;
+          setSelectedRecord(null);
+        }
+        return;
+      }
+
+      didSetRecordInTickRef.current = true;
+      queueMicrotask(() => {
+        didSetRecordInTickRef.current = false;
+      });
+
+      if (selectedRecordRef.current === null) {
+        pushNavSnapshotOncePerTick();
+      }
+
+      selectedRecordRef.current = nextRecord;
+      setSelectedRecord(nextRecord);
+    },
+    [pushNavSnapshotOncePerTick]
+  );
+
+  const handleSetSelectedCategory = useCallback(
+    (nextCategory: RecordCategory) => {
+      if (nextCategory !== selectedCategoryRef.current || activeViewRef.current !== 'items') {
+        pushNavSnapshotOncePerTick();
+      }
+      selectedCategoryRef.current = nextCategory;
+      setSelectedCategory(nextCategory);
+
+      if (!didSetRecordInTickRef.current && selectedRecordRef.current !== null) {
+        selectedRecordRef.current = null;
+        setSelectedRecord(null);
+      }
+    },
+    [pushNavSnapshotOncePerTick]
+  );
+
+  const handleSetActiveView = useCallback(
+    (nextView: AppView) => {
+      if (nextView === 'dashboard') {
+        navStackRef.current = [];
+        activeViewRef.current = 'dashboard';
+        selectedCategoryRef.current = 'all';
+        selectedRecordRef.current = null;
+        setActiveView('dashboard');
+        setSelectedCategory('all');
+        setSelectedRecord(null);
+        return;
+      }
+
+      if (nextView !== activeViewRef.current) {
+        pushNavSnapshotOncePerTick();
+        activeViewRef.current = nextView;
+        setActiveView(nextView);
+      }
+
+      if (!didSetRecordInTickRef.current && selectedRecordRef.current !== null) {
+        selectedRecordRef.current = null;
+        setSelectedRecord(null);
+      }
+    },
+    [pushNavSnapshotOncePerTick]
+  );
+
+  const navigateBack = useCallback(() => {
+    const currentView = activeViewRef.current;
+    const currentCat = selectedCategoryRef.current;
+    const currentRecId = selectedRecordRef.current?.id ?? null;
+
+    let target: { view: AppView; category: RecordCategory; recordId: string | null } | undefined;
+    while (navStackRef.current.length > 0) {
+      const candidate = navStackRef.current.pop()!;
+      const isSameState =
+        candidate.view === currentView &&
+        (candidate.view !== 'items' ||
+          (candidate.category === currentCat && candidate.recordId === currentRecId));
+      if (!isSameState) {
+        target = candidate;
+        break;
+      }
+    }
+
+    if (!target || target.view === 'dashboard') {
+      navStackRef.current = [];
+      activeViewRef.current = 'dashboard';
+      selectedCategoryRef.current = 'all';
+      selectedRecordRef.current = null;
+      setActiveView('dashboard');
+      setSelectedCategory('all');
+      setSelectedRecord(null);
+      return;
+    }
+
+    activeViewRef.current = target.view;
+    selectedCategoryRef.current = target.category;
+    const restoredRecord = target.recordId
+      ? recordsRef.current.find((r) => r.id === target!.recordId) || null
+      : null;
+    selectedRecordRef.current = restoredRecord;
+
+    setActiveView(target.view);
+    setSelectedCategory(target.category);
+    setSelectedRecord(restoredRecord);
+  }, []);
+
+  const canGoBack = activeView !== 'dashboard' || (activeView === 'items' && selectedRecord !== null);
+
   useBackHandler({
     id: 'vault-screen-navigation',
-    enabled: status === 'unlocked' && activeView !== 'dashboard',
+    enabled: status === 'unlocked' && canGoBack,
     priority: 50,
-    onBack: () => {
-      setViewHistory((prev) => {
-        if (prev.length <= 1) {
-          setActiveView('dashboard');
-          return ['dashboard'];
-        }
-        const updated = prev.slice(0, -1);
-        const previousView = updated[updated.length - 1] || 'dashboard';
-        setActiveView(previousView);
-        return updated;
-      });
-    },
+    onBack: navigateBack,
   });
 
   const lastActivityRef = useRef<number>(Date.now());
@@ -232,12 +344,16 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const lockVault = useCallback(() => {
     setCryptoKey(null);
     setRecords([]);
+    selectedRecordRef.current = null;
     setSelectedRecord(null);
     setEditingRecord(null);
     setIsMobileMenuOpen(false);
     setIntegrityWarning(null);
+    activeViewRef.current = 'dashboard';
+    selectedCategoryRef.current = 'all';
+    navStackRef.current = [];
     setActiveView('dashboard');
-    setViewHistory(['dashboard']);
+    setSelectedCategory('all');
     vaultRepository.setActiveKey(null);
     setStatus('locked');
     clipboardService.clearNow();
@@ -246,10 +362,10 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     if (status !== 'unlocked') return;
 
-    window.addEventListener('mousemove', recordUserActivity);
-    window.addEventListener('keydown', recordUserActivity);
-    window.addEventListener('click', recordUserActivity);
-    window.addEventListener('scroll', recordUserActivity);
+    window.addEventListener('mousemove', recordUserActivity, { passive: true });
+    window.addEventListener('keydown', recordUserActivity, { passive: true });
+    window.addEventListener('click', recordUserActivity, { passive: true });
+    window.addEventListener('scroll', recordUserActivity, { passive: true });
 
     const handleVisibilityChange = () => {
       if (document.hidden && settings.autoLockMinutes === 0) {
@@ -439,115 +555,164 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setRecords(updated);
       setIntegrityWarning(vaultRepository.getIntegrityWarning());
       setSelectedRecord((prev) => {
-        if (!prev) return null;
-        return updated.find((r) => r.id === prev.id) || null;
+        if (!prev) {
+          selectedRecordRef.current = null;
+          return null;
+        }
+        const found = updated.find((r) => r.id === prev.id) || null;
+        selectedRecordRef.current = found;
+        return found;
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const saveRecord = async (record: VaultRecord) => {
-    if (!cryptoKey) throw new Error('Vault is locked');
-    recordUserActivity();
-    const normalized: VaultRecord = {
-      ...record,
-      type: record.type || 'login',
-      website: record.website || record.url,
-      url: record.url || record.website,
-    };
-    await vaultRepository.saveRecord(normalized, cryptoKey);
-    await refreshRecords();
-  };
+  const saveRecord = useCallback(
+    async (record: VaultRecord) => {
+      if (!cryptoKey) throw new Error('Vault is locked');
+      recordUserActivity();
+      const normalized: VaultRecord = {
+        ...record,
+        type: record.type || 'login',
+        website: record.website || record.url,
+        url: record.url || record.website,
+      };
 
-  const addRecord = async (recordInput: Omit<VaultRecord, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const now = Date.now();
-    const fullRecord: VaultRecord = {
-      ...recordInput,
-      id: 'rec_' + window.crypto.randomUUID(),
-      type: recordInput.type || 'login',
-      website: recordInput.website || recordInput.url,
-      url: recordInput.url || recordInput.website,
-      createdAt: now,
-      updatedAt: now,
-    };
-    await saveRecord(fullRecord);
-  };
+      // Optimistically update in-memory state immediately so UI feels instantaneous
+      setRecords((prev) => {
+        const idx = prev.findIndex((r) => r.id === normalized.id);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = normalized;
+          return next;
+        }
+        return [normalized, ...prev];
+      });
+      if (selectedRecordRef.current && selectedRecordRef.current.id === normalized.id) {
+        selectedRecordRef.current = normalized;
+      }
+      setSelectedRecord((prev) => (prev && prev.id === normalized.id ? normalized : prev));
 
-  const updateRecord = async (id: string, updates: Partial<VaultRecord>) => {
-    const existing = records.find((r) => r.id === id);
-    if (!existing) return;
+      await vaultRepository.saveRecord(normalized, cryptoKey);
+    },
+    [cryptoKey, recordUserActivity]
+  );
 
-    const now = Date.now();
-    let passwordHistory = existing.passwordHistory || [];
-    if (updates.password && existing.password && updates.password !== existing.password) {
-      passwordHistory = [
-        {
-          id: 'hist_' + window.crypto.randomUUID(),
-          password: existing.password,
-          changedAt: now,
-        },
-        ...passwordHistory,
-      ].slice(0, 15);
-    }
+  const addRecord = useCallback(
+    async (recordInput: Omit<VaultRecord, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const now = Date.now();
+      const fullRecord: VaultRecord = {
+        ...recordInput,
+        id: 'rec_' + window.crypto.randomUUID(),
+        type: recordInput.type || 'login',
+        website: recordInput.website || recordInput.url,
+        url: recordInput.url || recordInput.website,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await saveRecord(fullRecord);
+    },
+    [saveRecord]
+  );
 
-    const updated: VaultRecord = {
-      ...existing,
-      ...updates,
-      website: updates.website ?? updates.url ?? existing.website ?? existing.url,
-      url: updates.url ?? updates.website ?? existing.url ?? existing.website,
-      passwordHistory,
-      updatedAt: now,
-    };
-    await saveRecord(updated);
-  };
+  const updateRecord = useCallback(
+    async (id: string, updates: Partial<VaultRecord>) => {
+      const existing = records.find((r) => r.id === id);
+      if (!existing) return;
 
-  const deleteRecord = async (id: string) => {
-    if (!cryptoKey) throw new Error('Vault is locked');
-    recordUserActivity();
-    await vaultRepository.deleteRecord(id);
-    if (selectedRecord?.id === id) {
-      setSelectedRecord(null);
-    }
-    await refreshRecords();
-  };
+      const now = Date.now();
+      let passwordHistory = existing.passwordHistory || [];
+      if (updates.password && existing.password && updates.password !== existing.password) {
+        passwordHistory = [
+          {
+            id: 'hist_' + window.crypto.randomUUID(),
+            password: existing.password,
+            changedAt: now,
+          },
+          ...passwordHistory,
+        ].slice(0, 15);
+      }
 
-  const softDeleteRecord = async (id: string) => {
-    await updateRecord(id, { deletedAt: Date.now() });
-    if (selectedRecord?.id === id) {
-      setSelectedRecord(null);
-    }
-  };
-
-  const restoreRecord = async (id: string) => {
-    await updateRecord(id, { deletedAt: undefined });
-  };
-
-  const permanentlyDeleteRecord = async (id: string) => {
-    await deleteRecord(id);
-  };
-
-  const toggleFavorite = async (id: string) => {
-    if (!cryptoKey) return;
-    const rec = records.find((r) => r.id === id);
-    if (rec) {
-      const updated = { ...rec, favorite: !rec.favorite, updatedAt: Date.now() };
+      const updated: VaultRecord = {
+        ...existing,
+        ...updates,
+        website: updates.website ?? updates.url ?? existing.website ?? existing.url,
+        url: updates.url ?? updates.website ?? existing.url ?? existing.website,
+        passwordHistory,
+        updatedAt: now,
+      };
       await saveRecord(updated);
-    }
-  };
+    },
+    [records, saveRecord]
+  );
 
-  const duplicateRecord = async (record: VaultRecord) => {
-    if (!cryptoKey) return;
-    const duplicated: VaultRecord = {
-      ...record,
-      id: 'rec_' + window.crypto.randomUUID(),
-      title: `${record.title} (Copy)`,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      favorite: false,
-    };
-    await saveRecord(duplicated);
-  };
+  const deleteRecord = useCallback(
+    async (id: string) => {
+      if (!cryptoKey) throw new Error('Vault is locked');
+      recordUserActivity();
+      setRecords((prev) => prev.filter((r) => r.id !== id));
+      if (selectedRecordRef.current?.id === id) {
+        selectedRecordRef.current = null;
+      }
+      setSelectedRecord((prev) => (prev?.id === id ? null : prev));
+      await vaultRepository.deleteRecord(id);
+    },
+    [cryptoKey, recordUserActivity]
+  );
+
+  const softDeleteRecord = useCallback(
+    async (id: string) => {
+      if (selectedRecordRef.current?.id === id) {
+        selectedRecordRef.current = null;
+      }
+      setSelectedRecord((prev) => (prev?.id === id ? null : prev));
+      await updateRecord(id, { deletedAt: Date.now() });
+    },
+    [updateRecord]
+  );
+
+  const restoreRecord = useCallback(
+    async (id: string) => {
+      await updateRecord(id, { deletedAt: undefined });
+    },
+    [updateRecord]
+  );
+
+  const permanentlyDeleteRecord = useCallback(
+    async (id: string) => {
+      await deleteRecord(id);
+    },
+    [deleteRecord]
+  );
+
+  const toggleFavorite = useCallback(
+    async (id: string) => {
+      if (!cryptoKey) return;
+      const rec = records.find((r) => r.id === id);
+      if (rec) {
+        const updated = { ...rec, favorite: !rec.favorite, updatedAt: Date.now() };
+        await saveRecord(updated);
+      }
+    },
+    [cryptoKey, records, saveRecord]
+  );
+
+  const duplicateRecord = useCallback(
+    async (record: VaultRecord) => {
+      if (!cryptoKey) return;
+      const duplicated: VaultRecord = {
+        ...record,
+        id: 'rec_' + window.crypto.randomUUID(),
+        title: `${record.title} (Copy)`,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        favorite: false,
+      };
+      await saveRecord(duplicated);
+    },
+    [cryptoKey, saveRecord]
+  );
 
   const importMultipleRecords = async (
     importedInput: VaultRecord[] | Promise<VaultRecord[]>
@@ -608,10 +773,14 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setFailedAttempts(0);
     setDetectedPasswordChange(null);
     setStatus('uninitialized');
+    selectedRecordRef.current = null;
     setSelectedRecord(null);
     setEditingRecord(null);
+    activeViewRef.current = 'dashboard';
+    selectedCategoryRef.current = 'all';
+    navStackRef.current = [];
     setActiveView('dashboard');
-    setViewHistory(['dashboard']);
+    setSelectedCategory('all');
   };
 
   const fetchFailedAttempts = async (): Promise<number> => {
@@ -704,11 +873,13 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         autoLockMinutes: settings.autoLockMinutes,
         clipboardClearSeconds: settings.clipboardClearSeconds,
         setActiveView: handleSetActiveView,
+        navigateBack,
+        canGoBack,
         setActiveSettingsTab,
-        setSelectedCategory,
+        setSelectedCategory: handleSetSelectedCategory,
         setSearchQuery,
         setSortBy,
-        setSelectedRecord,
+        setSelectedRecord: handleSetSelectedRecord,
         setEditingRecord,
         setIsCreateModalOpen,
         setIsGeneratorModalOpen,

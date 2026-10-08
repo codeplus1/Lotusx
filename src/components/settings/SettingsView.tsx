@@ -215,12 +215,7 @@ export const SettingsView: React.FC = () => {
   const newPwStrength = passwordGenerator.evaluateStrength(newPw);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
-      className="space-y-6 max-w-4xl mx-auto pb-12"
-    >
+    <div className="space-y-6 max-w-4xl mx-auto pb-12">
       {/* Header */}
       <div className="bg-bg-surface p-6 rounded-xl border border-border shadow-xs">
         <h1 className="text-2xl font-bold text-text-primary tracking-tight">
@@ -796,6 +791,6 @@ export const SettingsView: React.FC = () => {
           setTimeout(() => window.location.reload(), 800);
         }}
       />
-    </motion.div>
+    </div>
   );
 };

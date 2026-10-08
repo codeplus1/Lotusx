@@ -92,14 +92,6 @@ const VaultApp: React.FC = () => {
     onBack: () => setIsRestoreModalOpen(false),
   });
 
-  // Handle Android back button when viewing a selected record (master-detail view on mobile)
-  useBackHandler({
-    id: 'vault-selected-record-detail',
-    enabled: status === 'unlocked' && activeView === 'items' && selectedRecord !== null,
-    priority: 80,
-    onBack: () => setSelectedRecord(null),
-  });
-
   // Scroll viewport to vault-integrity-alert-banner if rendered off-screen when vault is first unlocked
   const hasScrolledIntegrityBannerRef = React.useRef(false);
 
@@ -371,7 +363,7 @@ const VaultApp: React.FC = () => {
         subtitle="Cryptographically random secrets generated locally with CSPRNG"
         maxWidth="lg"
       >
-        <PasswordGeneratorView isModal={true} />
+        {isGeneratorModalOpen && <PasswordGeneratorView isModal={true} />}
       </Modal>
 
       <PasswordChangePromptModal

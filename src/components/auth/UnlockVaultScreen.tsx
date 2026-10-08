@@ -280,9 +280,7 @@ export const UnlockVaultScreen: React.FC<UnlockVaultScreenProps> = ({
         </div>
       </motion.div>
 
-      <div className="relative z-10 text-center text-[11px] text-[#8493A5] font-mono">
-        AES-256-GCM • PBKDF2-HMAC-SHA256 • Zero-Knowledge Memory Isolation
-      </div>
+      <div className="relative z-10 h-8 select-none pointer-events-none" aria-hidden="true" />
     </div>
   );
 };

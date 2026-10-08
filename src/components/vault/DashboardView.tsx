@@ -14,7 +14,6 @@ import {
   KeyRound,
   ArrowRight,
   Clock,
-  Lock,
   Search,
   Landmark,
   CreditCard,
@@ -117,10 +116,6 @@ export const DashboardView: React.FC = () => {
   const oldCount = securityReport?.oldCount ?? 0;
   const strongCount = securityReport?.strongCount ?? 0;
 
-  const kdfMemoryMb = metadata?.kdfParams?.memorySize
-    ? Math.round(metadata.kdfParams.memorySize / 1024)
-    : 64;
-
   const handleOpenRecord = (rec: VaultRecord) => {
     setSelectedCategory('all');
     setSelectedRecord(rec);
@@ -129,15 +124,10 @@ export const DashboardView: React.FC = () => {
 
   const browseCategories = VAULT_CATEGORIES.filter(
     (c) => c.id !== 'all' && c.id !== 'favorites'
-  ).slice(0, 8);
+  ).slice(0, 4);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
-      className="space-y-6 max-w-7xl mx-auto pb-8"
-    >
+    <div className="space-y-6 max-w-7xl mx-auto pb-8">
       {/* Emergency Recovery Key First-Run Notice (if newly created vault) */}
       <AnimatePresence>
         {recoveryKeyNotice && (
@@ -208,151 +198,145 @@ export const DashboardView: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Top Welcome & Command Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-bg-surface p-6 rounded-xl border border-border shadow-xs">
-        <div>
-          <div className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-primary font-semibold mb-1">
-            <Lock className="w-3.5 h-3.5" />
-            Zero-Knowledge Encrypted Vault
+      {/* Unified Dashboard Header & Instant Lookup Card */}
+      <div className="bg-bg-surface p-5 sm:p-6 rounded-xl border border-border shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">
+              Dashboard
+            </h1>
           </div>
-          <h1 className="text-2xl font-bold text-text-primary tracking-tight">
-            Vault Security Dashboard
-          </h1>
-          <p className="text-xs text-text-secondary mt-0.5">
-            All credentials are encrypted locally via AES-256-GCM &amp; Argon2id ({kdfMemoryMb}MB). Zero network exposure.
-          </p>
-        </div>
 
-        <div className="flex flex-nowrap items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
-          <button
-            onClick={() => setIsGeneratorModalOpen(true)}
-            className="btn-outline flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs whitespace-nowrap cursor-pointer"
-          >
-            <KeyRound className="w-4 h-4 shrink-0" />
-            <span>Generate Password</span>
-          </button>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="btn-primary flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs whitespace-nowrap shadow-xs cursor-pointer"
-          >
-            <Plus className="w-4 h-4 shrink-0" />
-            <span>Add Credential</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Instant In-Memory Domain & Account Lookup Bar */}
-      <div className="bg-bg-surface p-4 sm:p-5 rounded-xl border border-border shadow-xs space-y-3">
-        <div className="relative">
-          <Search className="w-4 h-4 text-text-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            ref={searchInputRef}
-            id="dashboard-quick-search-input"
-            type="text"
-            value={quickFilterQuery}
-            onChange={(e) => setQuickFilterQuery(e.target.value)}
-            placeholder="Instant lookup by website domain (e.g. github.com) or account title... (Ctrl+K)"
-            className="w-full pl-10 pr-20 py-2.5 bg-bg-app border border-border rounded-xl text-xs sm:text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-          />
-          {quickFilterQuery ? (
+          <div className="grid grid-cols-2 sm:flex sm:flex-nowrap items-center gap-2.5 w-full sm:w-auto">
             <button
-              type="button"
-              onClick={() => setQuickFilterQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-medium text-text-secondary hover:text-text-primary px-2 py-1 rounded-md bg-bg-secondary cursor-pointer"
+              onClick={() => setIsGeneratorModalOpen(true)}
+              className="btn-outline flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer"
             >
-              Clear
+              <KeyRound className="w-4 h-4 shrink-0" />
+              <span>Generate Password</span>
             </button>
-          ) : (
-            <span className="hidden sm:inline-block absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-text-muted bg-bg-secondary px-2 py-0.5 rounded border border-border">
-              ⌘K / Ctrl+K
-            </span>
-          )}
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="btn-primary flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap shadow-xs cursor-pointer"
+            >
+              <Plus className="w-4 h-4 shrink-0" />
+              <span>Add Credential</span>
+            </button>
+          </div>
         </div>
 
-        {/* Instant Search Results Dropdown / Panel */}
-        {quickFilterQuery.trim() !== '' && (
-          <div className="pt-2 border-t border-border">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
-                Instant Matches ({filteredMatches.length})
-              </span>
-              <span className="text-[11px] text-text-muted font-mono">
-                In-Memory Filter • Zero Disk Index
-              </span>
-            </div>
-
-            {filteredMatches.length === 0 ? (
-              <div className="p-6 text-center rounded-xl bg-bg-app border border-border">
-                <p className="text-xs font-medium text-text-primary">
-                  No credentials matched &ldquo;{quickFilterQuery}&rdquo;
-                </p>
-                <p className="text-[11px] text-text-secondary mt-0.5">
-                  Try another search keyword or create a new entry.
-                </p>
-              </div>
+        <div className="pt-3.5 border-t border-border/70 space-y-3">
+          <div className="relative">
+            <Search className="w-4 h-4 text-text-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              ref={searchInputRef}
+              id="dashboard-quick-search-input"
+              type="text"
+              value={quickFilterQuery}
+              onChange={(e) => setQuickFilterQuery(e.target.value)}
+              placeholder="Search credentials by domain (e.g. github.com) or account title..."
+              className="w-full pl-10 pr-20 py-2.5 bg-bg-app border border-border rounded-xl text-xs sm:text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+            />
+            {quickFilterQuery ? (
+              <button
+                type="button"
+                onClick={() => setQuickFilterQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-medium text-text-secondary hover:text-text-primary px-2 py-1 rounded-md bg-bg-secondary cursor-pointer"
+              >
+                Clear
+              </button>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-72 overflow-y-auto pr-1">
-                {filteredMatches.map((rec) => {
-                  const meta = CATEGORY_METADATA[rec.category] || CATEGORY_METADATA.other;
-                  const domain = searchService.extractDomain(rec.website || rec.url);
-                  const isCopied = copiedFieldLabel === `dash-search-${rec.id}`;
-                  const secretToCopy =
-                    rec.password || rec.pin || rec.cardNumber || rec.accountNumber || '';
-
-                  return (
-                    <div
-                      key={rec.id}
-                      onClick={() => handleOpenRecord(rec)}
-                      className="p-3 rounded-xl bg-bg-app hover:bg-bg-secondary border border-border hover:border-primary/50 flex items-center justify-between gap-3 transition-all cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-lg bg-secondary text-white font-bold text-xs flex items-center justify-center shrink-0">
-                          {rec.title.slice(0, 2).toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-xs font-bold text-text-primary truncate group-hover:text-primary transition-colors">
-                              {rec.title}
-                            </p>
-                            {domain && (
-                              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20 truncate max-w-[130px]">
-                                {domain}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-text-secondary truncate">
-                            {rec.username || rec.email || meta.label}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {secretToCopy && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              copyToClipboard(secretToCopy, `dash-search-${rec.id}`);
-                            }}
-                            title="Copy password / secret"
-                            className={`p-2 rounded-lg text-xs transition-colors cursor-pointer ${
-                              isCopied
-                                ? 'bg-success/15 text-success'
-                                : 'bg-bg-surface hover:bg-primary hover:text-white text-text-secondary border border-border'
-                            }`}
-                          >
-                            {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                          </button>
-                        )}
-                        <ArrowRight className="w-3.5 h-3.5 text-text-muted group-hover:text-primary" />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <span className="hidden sm:inline-block absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-text-muted bg-bg-secondary px-2 py-0.5 rounded border border-border">
+                ⌘K / Ctrl+K
+              </span>
             )}
           </div>
-        )}
+
+          {/* Instant Search Results Dropdown / Panel */}
+          {quickFilterQuery.trim() !== '' && (
+            <div className="pt-2 border-t border-border">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
+                  Instant Matches ({filteredMatches.length})
+                </span>
+                <span className="text-[11px] text-text-muted font-mono">
+                  In-Memory Filter • Zero Disk Index
+                </span>
+              </div>
+
+              {filteredMatches.length === 0 ? (
+                <div className="p-6 text-center rounded-xl bg-bg-app border border-border">
+                  <p className="text-xs font-medium text-text-primary">
+                    No credentials matched &ldquo;{quickFilterQuery}&rdquo;
+                  </p>
+                  <p className="text-[11px] text-text-secondary mt-0.5">
+                    Try another search keyword or create a new entry.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-72 overflow-y-auto pr-1">
+                  {filteredMatches.map((rec) => {
+                    const meta = CATEGORY_METADATA[rec.category] || CATEGORY_METADATA.other;
+                    const domain = searchService.extractDomain(rec.website || rec.url);
+                    const isCopied = copiedFieldLabel === `dash-search-${rec.id}`;
+                    const secretToCopy =
+                      rec.password || rec.pin || rec.cardNumber || rec.accountNumber || '';
+
+                    return (
+                      <div
+                        key={rec.id}
+                        onClick={() => handleOpenRecord(rec)}
+                        className="p-3 rounded-xl bg-bg-app hover:bg-bg-secondary border border-border hover:border-primary/50 flex items-center justify-between gap-3 transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 rounded-lg bg-secondary text-white font-bold text-xs flex items-center justify-center shrink-0">
+                            {rec.title.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-xs font-bold text-text-primary truncate group-hover:text-primary transition-colors">
+                                {rec.title}
+                              </p>
+                              {domain && (
+                                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20 truncate max-w-[130px]">
+                                  {domain}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-text-secondary truncate">
+                              {rec.username || rec.email || meta.label}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {secretToCopy && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyToClipboard(secretToCopy, `dash-search-${rec.id}`);
+                              }}
+                              title="Copy password / secret"
+                              className={`p-2 rounded-lg text-xs transition-colors cursor-pointer ${
+                                isCopied
+                                  ? 'bg-success/15 text-success'
+                                  : 'bg-bg-surface hover:bg-primary hover:text-white text-text-secondary border border-border'
+                              }`}
+                            >
+                              {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                          )}
+                          <ArrowRight className="w-3.5 h-3.5 text-text-muted group-hover:text-primary" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Vault Categories Quick Grid */}
@@ -371,7 +355,7 @@ export const DashboardView: React.FC = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {browseCategories.map((cat) => {
             const IconComp = CATEGORY_ICON_MAP[cat.icon] || Folder;
             const count = categoryCounts[cat.id] || 0;
@@ -640,6 +624,6 @@ export const DashboardView: React.FC = () => {
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 };
