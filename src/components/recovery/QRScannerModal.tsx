@@ -16,11 +16,13 @@ import {
 import jsQR from 'jsqr';
 import { Modal } from '../common/Modal';
 import { emergencyKitService } from '../../services/RecoveryKitService';
+import { RestoreBackupResult } from '../../storage/BackupService';
+import { useVault } from '../../context/VaultContext';
 
 interface QRScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (recordCount: number) => void;
+  onSuccess: (recordCount: number, restored?: RestoreBackupResult) => void;
 }
 
 const isValidLotusXQr = (text: string): boolean => {
@@ -39,7 +41,9 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const { applyRestoredVault } = useVault();
   const [scannedPayload, setScannedPayload] = useState<string | null>(null);
+  const [manualPayloadInput, setManualPayloadInput] = useState('');
   const [password, setPassword] = useState('');
   const [isScanning, setIsScanning] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
@@ -150,7 +154,9 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       }
       ctx.drawImage(bitmap, 0, 0);
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'attemptBoth',
+      });
 
       if (code && code.data && isValidLotusXQr(code.data)) {
         setScannedPayload(code.data.trim());
@@ -174,8 +180,9 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         scannedPayload,
         password
       );
+      applyRestoredVault(result);
       setPassword('');
-      onSuccess(result.recordCount);
+      onSuccess(result.recordCount, result);
     } catch (err: unknown) {
       const msg =
         err instanceof Error
@@ -260,6 +267,38 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
                   className="hidden"
                 />
               </label>
+            </div>
+
+            {/* Or Paste Recovery QR String */}
+            <div className="pt-3 border-t border-border space-y-2">
+              <label className="block text-[11px] font-semibold text-text-secondary">
+                Or paste Emergency Kit QR payload string (`LOTUSX_BACKUP_V1:...`):
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={manualPayloadInput}
+                  onChange={(e) => setManualPayloadInput(e.target.value)}
+                  placeholder="LOTUSX_BACKUP_V1:..."
+                  className="flex-1 px-3 py-2 rounded-lg border border-border bg-bg-surface text-text-primary text-xs font-mono focus:outline-none focus:border-primary"
+                />
+                <button
+                  type="button"
+                  disabled={!manualPayloadInput.trim()}
+                  onClick={() => {
+                    const trimmed = manualPayloadInput.trim();
+                    if (isValidLotusXQr(trimmed)) {
+                      setError(null);
+                      setScannedPayload(trimmed);
+                    } else {
+                      setError('Invalid Recovery Kit string. Expected LOTUSX_BACKUP_V1:... or encrypted JSON.');
+                    }
+                  }}
+                  className="px-3.5 py-2 rounded-lg border border-border hover:bg-bg-secondary text-xs font-semibold text-text-primary cursor-pointer disabled:opacity-50"
+                >
+                  Use Payload
+                </button>
+              </div>
             </div>
           </div>
         ) : (

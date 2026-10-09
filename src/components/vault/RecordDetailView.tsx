@@ -13,13 +13,10 @@ import {
   Edit3,
   Trash2,
   RotateCcw,
-  Star,
   ExternalLink,
   Calendar,
   History,
   Shield,
-  Tag,
-  ArrowLeft,
   QrCode,
   Sparkles,
   Plus,
@@ -34,9 +31,13 @@ import {
   Lock,
   ChevronDown,
   ChevronUp,
+  Wifi,
+  UserCheck,
+  Globe,
+  MapPin,
 } from 'lucide-react';
 import { useVault } from '../../context/VaultContext';
-import { CATEGORY_METADATA, CustomField } from '../../types/vault';
+import { CustomField } from '../../types/vault';
 import { passwordGenerator } from '../../security/PasswordGeneratorService';
 import { totpService } from '../../security/TotpService';
 
@@ -161,13 +162,11 @@ const DetailRow: React.FC<DetailRowProps> = ({
 export const RecordDetailView: React.FC = () => {
   const {
     selectedRecord,
-    navigateBack,
     setEditingRecord,
     updateRecord,
     softDeleteRecord,
     restoreRecord,
     permanentlyDeleteRecord,
-    toggleFavorite,
     copyToClipboard,
     copiedFieldLabel,
   } = useVault();
@@ -242,7 +241,6 @@ export const RecordDetailView: React.FC = () => {
 
   if (!selectedRecord) return null;
 
-  const meta = CATEGORY_METADATA[selectedRecord.category] || CATEGORY_METADATA.other;
   const strength = selectedRecord.password
     ? passwordGenerator.evaluateStrength(selectedRecord.password)
     : null;
@@ -316,22 +314,53 @@ export const RecordDetailView: React.FC = () => {
     setNewCustomValue(generated);
   };
 
+  const isWifiCategory = selectedRecord.category === 'wifi';
+  const isIdentityCategory = selectedRecord.category === 'identity';
+
   const hasPrimaryCredentials = Boolean(
-    selectedRecord.username ||
-      selectedRecord.email ||
-      selectedRecord.password ||
-      selectedRecord.url
+    !isWifiCategory &&
+      !isIdentityCategory &&
+      (selectedRecord.username ||
+        selectedRecord.email ||
+        selectedRecord.password ||
+        selectedRecord.url)
   );
 
+  const bd = selectedRecord.bankDetails;
   const hasBankingDetails = Boolean(
-    selectedRecord.bankName || selectedRecord.accountNumber || selectedRecord.routingOrIfsc
+    selectedRecord.bankName ||
+      bd?.bankName ||
+      selectedRecord.accountNumber ||
+      bd?.accountNumber ||
+      selectedRecord.routingOrIfsc ||
+      bd?.branchCode ||
+      bd?.swiftBic ||
+      bd?.iban
   );
 
+  const cd = selectedRecord.cardDetails;
   const hasCardDetails = Boolean(
     selectedRecord.cardNumber ||
+      cd?.cardNumber ||
       selectedRecord.cardExpiry ||
       selectedRecord.cardCvv ||
-      selectedRecord.cardPin
+      selectedRecord.cardPin ||
+      selectedRecord.cardholderName ||
+      cd?.cardholderName
+  );
+
+  const idDet = selectedRecord.identityDetails;
+  const hasIdentityDetails = Boolean(
+    isIdentityCategory ||
+      idDet?.fullName ||
+      idDet?.documentNumber ||
+      idDet?.passportNumber ||
+      idDet?.idNumber
+  );
+
+  const wd = selectedRecord.wifiDetails;
+  const hasWifiDetails = Boolean(
+    isWifiCategory || wd?.ssid || wd?.password
   );
 
   const customFieldsList = selectedRecord.customFields || [];
@@ -341,114 +370,6 @@ export const RecordDetailView: React.FC = () => {
       key={selectedRecord.id}
       className="bg-bg-surface rounded-xl border border-border shadow-xs overflow-hidden"
     >
-      {/* Top Header Bar */}
-      <div className="p-4 sm:p-6 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-bg-secondary/50">
-        <div className="flex items-center gap-3.5 min-w-0">
-          <button
-            type="button"
-            onClick={navigateBack}
-            className="lg:hidden p-2 -ml-1 rounded-xl text-text-secondary hover:text-text-primary hover:bg-bg-surface border border-transparent hover:border-border cursor-pointer touch-target flex items-center justify-center shrink-0"
-            aria-label="Back to list"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg shrink-0 shadow-xs bg-secondary text-white">
-            {selectedRecord.title.slice(0, 2).toUpperCase()}
-          </div>
-
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg sm:text-xl font-bold text-text-primary truncate">
-                {selectedRecord.title}
-              </h2>
-              {!selectedRecord.deletedAt && (
-                <button
-                  type="button"
-                  onClick={() => toggleFavorite(selectedRecord.id)}
-                  className="text-text-muted hover:text-primary transition-colors cursor-pointer p-1"
-                  title={selectedRecord.favorite ? 'Remove from favorites' : 'Pin to favorites'}
-                >
-                  <Star
-                    className={`w-4 h-4 ${
-                      selectedRecord.favorite ? 'text-primary fill-primary' : ''
-                    }`}
-                  />
-                </button>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 mt-1">
-              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/25">
-                {meta.label}
-              </span>
-              {selectedRecord.deletedAt && (
-                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-error/15 text-error">
-                  In Trash
-                </span>
-              )}
-              <span className="text-[11px] text-text-muted inline-flex items-center gap-1">
-                <Lock className="w-3 h-3 text-success" />
-                AES-256-GCM Encrypted
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-          {!selectedRecord.deletedAt ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setEditingRecord(selectedRecord)}
-                className="btn-secondary flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs cursor-pointer"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-                Edit Record
-              </button>
-              <button
-                type="button"
-                onClick={() => softDeleteRecord(selectedRecord.id)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-error/30 bg-error/10 hover:bg-error/20 text-xs font-semibold text-error transition-colors cursor-pointer"
-                title="Move to Trash"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => restoreRecord(selectedRecord.id)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-success text-white text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                Restore
-              </button>
-              {!confirmPermanentDelete ? (
-                <button
-                  type="button"
-                  onClick={() => setConfirmPermanentDelete(true)}
-                  className="btn-danger flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Delete Forever
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => permanentlyDeleteRecord(selectedRecord.id)}
-                  className="btn-danger flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs cursor-pointer animate-pulse"
-                >
-                  Confirm Wipe
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-
       {/* Main Details Content */}
       <div className="p-4 sm:p-6 space-y-6">
         {/* 1. Primary Login & Authentication Section */}
@@ -483,7 +404,7 @@ export const RecordDetailView: React.FC = () => {
               />
 
               <DetailRow
-                label="Password / Secret Key"
+                label="Password"
                 value={selectedRecord.password}
                 fieldId="password"
                 isSecret={true}
@@ -493,19 +414,6 @@ export const RecordDetailView: React.FC = () => {
                 onToggleReveal={toggleFieldReveal}
                 copiedFieldLabel={copiedFieldLabel}
                 onCopy={copyToClipboard}
-                extraBadge={
-                  strength ? (
-                    <span
-                      className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                      style={{
-                        backgroundColor: `${strength.color}20`,
-                        color: strength.color,
-                      }}
-                    >
-                      {strength.label} • {strength.entropyBits} bits
-                    </span>
-                  ) : undefined
-                }
                 subContent={
                   strength ? (
                     <div className="space-y-1.5">
@@ -533,10 +441,9 @@ export const RecordDetailView: React.FC = () => {
               />
 
               <DetailRow
-                label="Website / Launch URL"
+                label="Website"
                 value={selectedRecord.url}
                 fieldId="url"
-                isUrl={true}
                 icon={<ExternalLink className="w-3.5 h-3.5" />}
                 revealedFields={revealedFields}
                 onToggleReveal={toggleFieldReveal}
@@ -553,7 +460,7 @@ export const RecordDetailView: React.FC = () => {
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
                 <QrCode className="w-3.5 h-3.5 text-primary" />
-                Two-Factor Authenticator (TOTP 2FA)
+                2FA
               </h3>
               {!selectedRecord.deletedAt && (
                 <button
@@ -638,17 +545,17 @@ export const RecordDetailView: React.FC = () => {
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-text-primary">
-                        Two-Factor Authenticator (2FA / TOTP)
+                        2FA
                       </h4>
                       <p className="text-[11px] text-text-secondary">
-                        Generate live 6-digit verification codes every 30s inside this credential.
+                        Generate 6-digit verification codes.
                       </p>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setIsSettingUpTotp(true)}
-                    className="btn-outline px-3 py-1.5 rounded-lg text-xs cursor-pointer shrink-0"
+                    className="btn-outline px-2.5 py-1 rounded-md text-[11px] font-semibold cursor-pointer shrink-0 whitespace-nowrap"
                   >
                     + Setup 2FA
                   </button>
@@ -720,13 +627,13 @@ export const RecordDetailView: React.FC = () => {
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
               <Building2 className="w-3.5 h-3.5 text-primary" />
-              Banking & Account Details
+              Banking &amp; Account Details
             </h3>
 
-            <div className="grid grid-cols-1 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <DetailRow
-                label="Financial Institution / Bank Name"
-                value={selectedRecord.bankName}
+                label="Bank Name"
+                value={bd?.bankName || selectedRecord.bankName}
                 fieldId="bankName"
                 icon={<Building2 className="w-3.5 h-3.5" />}
                 revealedFields={revealedFields}
@@ -736,8 +643,30 @@ export const RecordDetailView: React.FC = () => {
               />
 
               <DetailRow
-                label="Bank Account Number"
-                value={selectedRecord.accountNumber}
+                label="Account Holder Name"
+                value={bd?.accountHolderName || selectedRecord.accountHolderName}
+                fieldId="accountHolderName"
+                icon={<User className="w-3.5 h-3.5" />}
+                revealedFields={revealedFields}
+                onToggleReveal={toggleFieldReveal}
+                copiedFieldLabel={copiedFieldLabel}
+                onCopy={copyToClipboard}
+              />
+
+              <DetailRow
+                label="Account Type"
+                value={bd?.accountType || selectedRecord.accountType}
+                fieldId="accountType"
+                icon={<Building2 className="w-3.5 h-3.5" />}
+                revealedFields={revealedFields}
+                onToggleReveal={toggleFieldReveal}
+                copiedFieldLabel={copiedFieldLabel}
+                onCopy={copyToClipboard}
+              />
+
+              <DetailRow
+                label="Account Number"
+                value={bd?.accountNumber || selectedRecord.accountNumber}
                 fieldId="accountNumber"
                 isSecret={true}
                 isMono={true}
@@ -749,11 +678,47 @@ export const RecordDetailView: React.FC = () => {
               />
 
               <DetailRow
-                label="Routing / IFSC / SWIFT Code"
-                value={selectedRecord.routingOrIfsc}
+                label="Branch Name"
+                value={bd?.branchName || selectedRecord.branchName}
+                fieldId="branchName"
+                icon={<Building2 className="w-3.5 h-3.5" />}
+                revealedFields={revealedFields}
+                onToggleReveal={toggleFieldReveal}
+                copiedFieldLabel={copiedFieldLabel}
+                onCopy={copyToClipboard}
+              />
+
+              <DetailRow
+                label="Branch Code / Routing / IFSC"
+                value={bd?.branchCode || selectedRecord.branchCode || selectedRecord.routingOrIfsc}
                 fieldId="routingOrIfsc"
                 isMono={true}
                 icon={<Building2 className="w-3.5 h-3.5" />}
+                revealedFields={revealedFields}
+                onToggleReveal={toggleFieldReveal}
+                copiedFieldLabel={copiedFieldLabel}
+                onCopy={copyToClipboard}
+              />
+
+              <DetailRow
+                label="SWIFT / BIC Code"
+                value={bd?.swiftBic || selectedRecord.swiftBic}
+                fieldId="swiftBic"
+                isMono={true}
+                icon={<Globe className="w-3.5 h-3.5" />}
+                revealedFields={revealedFields}
+                onToggleReveal={toggleFieldReveal}
+                copiedFieldLabel={copiedFieldLabel}
+                onCopy={copyToClipboard}
+              />
+
+              <DetailRow
+                label="IBAN"
+                value={bd?.iban || selectedRecord.iban}
+                fieldId="iban"
+                isSecret={true}
+                isMono={true}
+                icon={<Globe className="w-3.5 h-3.5" />}
                 revealedFields={revealedFields}
                 onToggleReveal={toggleFieldReveal}
                 copiedFieldLabel={copiedFieldLabel}
@@ -772,22 +737,38 @@ export const RecordDetailView: React.FC = () => {
             </h3>
 
             {/* Interactive Visual Card Banner (Dark Navy & Deep Navy) */}
-            {selectedRecord.cardNumber && (
+            {(selectedRecord.cardNumber || cd?.cardNumber) && (
               <div className="p-5 rounded-xl bg-gradient-to-br from-[#03152F] via-[#062A63] to-[#03152F] text-white shadow-sm border border-[#1D3855] space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-mono uppercase tracking-widest text-[#B8C6D8]">
-                    {selectedRecord.bankName || selectedRecord.title}
+                    {cd?.issuingBank ||
+                      selectedRecord.issuingBank ||
+                      selectedRecord.bankName ||
+                      selectedRecord.title}
                   </span>
-                  <CreditCard className="w-5 h-5 text-[#08BBD4]" />
+                  <span className="text-[11px] font-mono font-bold text-[#08BBD4]">
+                    {cd?.cardNetwork || selectedRecord.cardNetwork || 'CARD'}
+                    {(cd?.cardKind || selectedRecord.cardKind)
+                      ? ` • ${cd?.cardKind || selectedRecord.cardKind}`
+                      : ''}
+                  </span>
                 </div>
 
                 <div className="font-mono text-lg sm:text-xl tracking-widest font-semibold text-white">
                   {revealedFields['cardNumber']
-                    ? selectedRecord.cardNumber
-                    : `•••• •••• •••• ${selectedRecord.cardNumber.replace(/\s+/g, '').slice(-4)}`}
+                    ? selectedRecord.cardNumber || cd?.cardNumber
+                    : `•••• •••• •••• ${(selectedRecord.cardNumber || cd?.cardNumber || '')
+                        .replace(/\s+/g, '')
+                        .slice(-4)}`}
                 </div>
 
                 <div className="flex items-center justify-between text-xs text-[#B8C6D8] font-mono pt-1">
+                  <div>
+                    <span className="block text-[9px] uppercase text-[#8493A5]">CARDHOLDER</span>
+                    <span className="truncate max-w-[140px] inline-block">
+                      {cd?.cardholderName || selectedRecord.cardholderName || '—'}
+                    </span>
+                  </div>
                   <div>
                     <span className="block text-[9px] uppercase text-[#8493A5]">EXPIRES</span>
                     <span>{selectedRecord.cardExpiry || '••/••'}</span>
@@ -795,13 +776,9 @@ export const RecordDetailView: React.FC = () => {
                   <div>
                     <span className="block text-[9px] uppercase text-[#8493A5]">CVV</span>
                     <span>
-                      {revealedFields['cardCvv'] ? selectedRecord.cardCvv || '—' : '•••'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="block text-[9px] uppercase text-[#8493A5]">PIN</span>
-                    <span>
-                      {revealedFields['cardPin'] ? selectedRecord.cardPin || '—' : '••••'}
+                      {revealedFields['cardCvv']
+                        ? selectedRecord.cardCvv || cd?.cvv || '—'
+                        : '•••'}
                     </span>
                   </div>
                 </div>
@@ -809,10 +786,36 @@ export const RecordDetailView: React.FC = () => {
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <DetailRow
+                label="Cardholder Name"
+                value={cd?.cardholderName || selectedRecord.cardholderName}
+                fieldId="cardholderName"
+                icon={<User className="w-3.5 h-3.5" />}
+                revealedFields={revealedFields}
+                onToggleReveal={toggleFieldReveal}
+                copiedFieldLabel={copiedFieldLabel}
+                onCopy={copyToClipboard}
+              />
+
+              <DetailRow
+                label="Card Type & Network"
+                value={
+                  [cd?.cardKind || selectedRecord.cardKind, cd?.cardNetwork || selectedRecord.cardNetwork]
+                    .filter(Boolean)
+                    .join(' • ') || undefined
+                }
+                fieldId="cardNetwork"
+                icon={<CreditCard className="w-3.5 h-3.5" />}
+                revealedFields={revealedFields}
+                onToggleReveal={toggleFieldReveal}
+                copiedFieldLabel={copiedFieldLabel}
+                onCopy={copyToClipboard}
+              />
+
               <div className="sm:col-span-2">
                 <DetailRow
                   label="Card Number"
-                  value={selectedRecord.cardNumber}
+                  value={selectedRecord.cardNumber || cd?.cardNumber}
                   fieldId="cardNumber"
                   isSecret={true}
                   isMono={true}
@@ -838,7 +841,7 @@ export const RecordDetailView: React.FC = () => {
 
               <DetailRow
                 label="Card Security Code (CVV / CVC)"
-                value={selectedRecord.cardCvv}
+                value={selectedRecord.cardCvv || cd?.cvv}
                 fieldId="cardCvv"
                 isSecret={true}
                 isMono={true}
@@ -851,7 +854,7 @@ export const RecordDetailView: React.FC = () => {
 
               <DetailRow
                 label="ATM / Card PIN"
-                value={selectedRecord.cardPin}
+                value={selectedRecord.cardPin || cd?.pin}
                 fieldId="cardPin"
                 isSecret={true}
                 isMono={true}
@@ -861,26 +864,193 @@ export const RecordDetailView: React.FC = () => {
                 copiedFieldLabel={copiedFieldLabel}
                 onCopy={copyToClipboard}
               />
+
+              <DetailRow
+                label="Issuing Bank"
+                value={cd?.issuingBank || selectedRecord.issuingBank}
+                fieldId="issuingBank"
+                icon={<Building2 className="w-3.5 h-3.5" />}
+                revealedFields={revealedFields}
+                onToggleReveal={toggleFieldReveal}
+                copiedFieldLabel={copiedFieldLabel}
+                onCopy={copyToClipboard}
+              />
+
+              <div className="sm:col-span-2">
+                <DetailRow
+                  label="Billing Address"
+                  value={cd?.billingAddress || selectedRecord.billingAddress}
+                  fieldId="billingAddress"
+                  icon={<MapPin className="w-3.5 h-3.5" />}
+                  revealedFields={revealedFields}
+                  onToggleReveal={toggleFieldReveal}
+                  copiedFieldLabel={copiedFieldLabel}
+                  onCopy={copyToClipboard}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 4B. Personal Identity Details */}
+        {hasIdentityDetails && (
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+              <UserCheck className="w-3.5 h-3.5 text-primary" />
+              Identity Document Details
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <DetailRow
+                label="Full Name"
+                value={idDet?.fullName || selectedRecord.username}
+                fieldId="identityFullName"
+                icon={<User className="w-3.5 h-3.5" />}
+                revealedFields={revealedFields}
+                onToggleReveal={toggleFieldReveal}
+                copiedFieldLabel={copiedFieldLabel}
+                onCopy={copyToClipboard}
+              />
+
+              <DetailRow
+                label="Document Type"
+                value={idDet?.documentType}
+                fieldId="identityDocType"
+                icon={<UserCheck className="w-3.5 h-3.5" />}
+                revealedFields={revealedFields}
+                onToggleReveal={toggleFieldReveal}
+                copiedFieldLabel={copiedFieldLabel}
+                onCopy={copyToClipboard}
+              />
+
+              <DetailRow
+                label="Document Number"
+                value={idDet?.documentNumber || idDet?.passportNumber || idDet?.idNumber}
+                fieldId="identityDocNumber"
+                isSecret={true}
+                isMono={true}
+                icon={<Hash className="w-3.5 h-3.5" />}
+                revealedFields={revealedFields}
+                onToggleReveal={toggleFieldReveal}
+                copiedFieldLabel={copiedFieldLabel}
+                onCopy={copyToClipboard}
+              />
+
+              <DetailRow
+                label="Issuing Country / Authority"
+                value={idDet?.issuingCountry}
+                fieldId="identityCountry"
+                icon={<Globe className="w-3.5 h-3.5" />}
+                revealedFields={revealedFields}
+                onToggleReveal={toggleFieldReveal}
+                copiedFieldLabel={copiedFieldLabel}
+                onCopy={copyToClipboard}
+              />
+
+              <DetailRow
+                label="Date of Birth"
+                value={idDet?.dateOfBirth}
+                fieldId="identityDob"
+                isMono={true}
+                icon={<Calendar className="w-3.5 h-3.5" />}
+                revealedFields={revealedFields}
+                onToggleReveal={toggleFieldReveal}
+                copiedFieldLabel={copiedFieldLabel}
+                onCopy={copyToClipboard}
+              />
+
+              <DetailRow
+                label="Issue & Expiry Date"
+                value={
+                  [
+                    idDet?.issueDate ? `Issued: ${idDet.issueDate}` : '',
+                    idDet?.expiryDate ? `Expires: ${idDet.expiryDate}` : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' • ') || undefined
+                }
+                fieldId="identityDates"
+                isMono={true}
+                icon={<Calendar className="w-3.5 h-3.5" />}
+                revealedFields={revealedFields}
+                onToggleReveal={toggleFieldReveal}
+                copiedFieldLabel={copiedFieldLabel}
+                onCopy={copyToClipboard}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* 4C. Wi-Fi Network Details */}
+        {hasWifiDetails && (
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+              <Wifi className="w-3.5 h-3.5 text-primary" />
+              Wi-Fi Network Configuration
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <DetailRow
+                label="Network Name (SSID)"
+                value={wd?.ssid || selectedRecord.username}
+                fieldId="wifiSsid"
+                isMono={true}
+                icon={<Wifi className="w-3.5 h-3.5" />}
+                revealedFields={revealedFields}
+                onToggleReveal={toggleFieldReveal}
+                copiedFieldLabel={copiedFieldLabel}
+                onCopy={copyToClipboard}
+              />
+
+              <DetailRow
+                label="Security Type"
+                value={
+                  wd?.securityType
+                    ? `${wd.securityType}${wd.hiddenNetwork ? ' (Hidden SSID)' : ''}`
+                    : undefined
+                }
+                fieldId="wifiSecurity"
+                icon={<Shield className="w-3.5 h-3.5" />}
+                revealedFields={revealedFields}
+                onToggleReveal={toggleFieldReveal}
+                copiedFieldLabel={copiedFieldLabel}
+                onCopy={copyToClipboard}
+              />
+
+              <div className="sm:col-span-2">
+                <DetailRow
+                  label="Wi-Fi Password"
+                  value={wd?.password || selectedRecord.password}
+                  fieldId="wifiPassword"
+                  isSecret={true}
+                  isMono={true}
+                  icon={<KeyRound className="w-3.5 h-3.5" />}
+                  revealedFields={revealedFields}
+                  onToggleReveal={toggleFieldReveal}
+                  copiedFieldLabel={copiedFieldLabel}
+                  onCopy={copyToClipboard}
+                />
+              </div>
             </div>
           </div>
         )}
 
         {/* 5. Custom Encrypted Attributes Section */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-primary" />
-              Custom Encrypted Fields ({customFieldsList.length})
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5 min-w-0 truncate">
+              <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
+              <span className="truncate">Custom Encrypted Fields ({customFieldsList.length})</span>
             </h3>
 
             {!selectedRecord.deletedAt && !isAddingCustomField && (
               <button
                 type="button"
                 onClick={() => setIsAddingCustomField(true)}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-dark cursor-pointer"
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary-dark cursor-pointer whitespace-nowrap shrink-0"
               >
-                <Plus className="w-3.5 h-3.5" />
-                Add Custom Field
+                <Plus className="w-3 h-3 shrink-0" />
+                <span>Add Custom Field</span>
               </button>
             )}
           </div>
@@ -1045,22 +1215,7 @@ export const RecordDetailView: React.FC = () => {
           </div>
         )}
 
-        {/* 7. Tags */}
-        {selectedRecord.tags.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap pt-1">
-            <Tag className="w-3.5 h-3.5 text-text-muted" />
-            {selectedRecord.tags.map((t) => (
-              <span
-                key={t}
-                className="px-2.5 py-1 rounded-lg bg-bg-secondary text-text-secondary text-xs font-mono border border-border"
-              >
-                #{t}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* 8. Password History Accordion */}
+        {/* 7. Password History Accordion */}
         {selectedRecord.passwordHistory && selectedRecord.passwordHistory.length > 0 && (
           <div className="pt-4 border-t border-border">
             <button
@@ -1136,6 +1291,60 @@ export const RecordDetailView: React.FC = () => {
             <Shield className="w-3.5 h-3.5 text-success" />
             <span>Last Encrypted: {new Date(selectedRecord.updatedAt).toLocaleString()}</span>
           </div>
+        </div>
+
+        {/* 10. Bottom Record Action Buttons */}
+        <div className="pt-4 border-t border-border flex items-center justify-end gap-3">
+          {!selectedRecord.deletedAt ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setEditingRecord(selectedRecord)}
+                className="btn-secondary flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold cursor-pointer flex-1 sm:flex-initial"
+              >
+                <Edit3 className="w-4 h-4" />
+                Edit Record
+              </button>
+              <button
+                type="button"
+                onClick={() => softDeleteRecord(selectedRecord.id)}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-error/30 bg-error/10 hover:bg-error/20 text-xs font-semibold text-error transition-colors cursor-pointer flex-1 sm:flex-initial"
+                title="Move to Trash"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => restoreRecord(selectedRecord.id)}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-success text-white text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer flex-1 sm:flex-initial"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Restore
+              </button>
+              {!confirmPermanentDelete ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmPermanentDelete(true)}
+                  className="btn-danger flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold cursor-pointer flex-1 sm:flex-initial"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete Forever
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => permanentlyDeleteRecord(selectedRecord.id)}
+                  className="btn-danger flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold cursor-pointer animate-pulse flex-1 sm:flex-initial"
+                >
+                  Confirm Wipe
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

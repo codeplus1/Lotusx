@@ -15,6 +15,8 @@ class NavigationService {
   private isBackPressActive = false;
   private isProgrammaticPop = false;
   private isInitialized = false;
+  private lastRootBackPressAt = 0;
+  private exitPromptListeners = new Set<(visible: boolean) => void>();
 
   constructor() {
     this.init();
@@ -24,8 +26,34 @@ class NavigationService {
     if (typeof window === 'undefined' || this.isInitialized) return;
     this.isInitialized = true;
 
+    // Ensure root sentinel is pushed so a single hardware back press at the root screen is intercepted
+    this.ensureSentinel();
+
     // Listen to hardware / browser back button via popstate
     window.addEventListener('popstate', this.handlePopState);
+  }
+
+  private ensureSentinel() {
+    if (typeof window === 'undefined') return;
+    if (this.historyDepth === 0) {
+      try {
+        window.history.pushState({ lotusxBackSentinel: true }, '');
+        this.historyDepth = 1;
+      } catch {
+        // Ignore history push limits in iframe contexts
+      }
+    }
+  }
+
+  public onExitPromptChange(listener: (visible: boolean) => void): () => void {
+    this.exitPromptListeners.add(listener);
+    return () => {
+      this.exitPromptListeners.delete(listener);
+    };
+  }
+
+  private notifyExitPrompt(visible: boolean) {
+    this.exitPromptListeners.forEach((cb) => cb(visible));
   }
 
   private handlePopState = () => {
@@ -39,7 +67,21 @@ class NavigationService {
     this.historyDepth = Math.max(0, this.historyDepth - 1);
 
     if (this.stack.length === 0) {
-      // At root screen - allow native back to exit the app
+      const now = Date.now();
+      // Require double back press within 2000ms to exit on root screen
+      if (now - this.lastRootBackPressAt < 2000) {
+        this.notifyExitPrompt(false);
+        return;
+      }
+
+      this.lastRootBackPressAt = now;
+      this.ensureSentinel();
+      this.notifyExitPrompt(true);
+      setTimeout(() => {
+        if (Date.now() - this.lastRootBackPressAt >= 2000) {
+          this.notifyExitPrompt(false);
+        }
+      }, 2000);
       return;
     }
 
@@ -65,14 +107,7 @@ class NavigationService {
       // Allow synchronous unmount/unregister callbacks to complete before resetting
       setTimeout(() => {
         this.isBackPressActive = false;
-        if (this.stack.length > 0 && this.historyDepth === 0) {
-          try {
-            window.history.pushState({ lotusxBackSentinel: true }, '');
-            this.historyDepth = 1;
-          } catch {
-            // Ignore history push limits in iframe contexts
-          }
-        }
+        this.ensureSentinel();
       }, 0);
     }
   };
@@ -90,18 +125,8 @@ class NavigationService {
       return;
     }
 
-    const wasEmpty = this.stack.length === 0;
     this.stack.push(action);
-
-    // Push a single sentinel history state only when transitioning from root to non-root
-    if (wasEmpty && this.historyDepth === 0) {
-      try {
-        window.history.pushState({ lotusxBackSentinel: true }, '');
-        this.historyDepth = 1;
-      } catch {
-        // Ignore history push limits in iframe contexts
-      }
-    }
+    this.ensureSentinel();
   }
 
   /**

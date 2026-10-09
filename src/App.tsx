@@ -49,6 +49,7 @@ const VaultApp: React.FC = () => {
     detectedPasswordChange,
     setDetectedPasswordChange,
     applyDetectedPasswordChange,
+    applyRestoredVault,
   } = useVault();
 
   const [isApplyingPasswordChange, setIsApplyingPasswordChange] = useState(false);
@@ -127,7 +128,7 @@ const VaultApp: React.FC = () => {
     }
   }, [status, integrityWarning]);
 
-  // Restore handler for uninitialized vault
+  // Restore handler for uninitialized or locked vault
   const handleRestoreBackup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!restoreFile || !restorePassword) return;
@@ -138,10 +139,13 @@ const VaultApp: React.FC = () => {
     try {
       const fileText = await restoreFile.text();
       const restored = await backupService.restoreEncryptedBackup(fileText, restorePassword);
+      applyRestoredVault(restored);
       setRestoreSuccessMessage(
-        `Restored ${restored.recordCount} credentials! Reloading vault...`
+        `Restored ${restored.recordCount} credentials! Opening vault...`
       );
-      setTimeout(() => window.location.reload(), 1200);
+      setIsRestoreModalOpen(false);
+      setRestoreFile(null);
+      setRestorePassword('');
     } catch (err: unknown) {
       setRestoreError(
         err instanceof Error ? err.message : 'Decryption failed. Check your password.'
@@ -241,7 +245,6 @@ const VaultApp: React.FC = () => {
           onClose={() => setIsGoogleDriveModalOpen(false)}
           onRestoreSuccess={() => {
             setIsGoogleDriveModalOpen(false);
-            window.location.reload();
           }}
         />
 
@@ -250,7 +253,6 @@ const VaultApp: React.FC = () => {
           onClose={() => setIsQRScannerModalOpen(false)}
           onSuccess={() => {
             setIsQRScannerModalOpen(false);
-            window.location.reload();
           }}
         />
 
@@ -274,7 +276,6 @@ const VaultApp: React.FC = () => {
           onClose={() => setIsGoogleDriveModalOpen(false)}
           onRestoreSuccess={() => {
             setIsGoogleDriveModalOpen(false);
-            window.location.reload();
           }}
         />
 
@@ -283,7 +284,6 @@ const VaultApp: React.FC = () => {
           onClose={() => setIsQRScannerModalOpen(false)}
           onSuccess={() => {
             setIsQRScannerModalOpen(false);
-            window.location.reload();
           }}
         />
 
@@ -390,8 +390,6 @@ export default function App() {
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
       <VaultProvider>
         <VaultApp />
-        <InstallAppPromptBanner />
-        <UpdateNotificationBanner />
       </VaultProvider>
     </ThemeProvider>
   );

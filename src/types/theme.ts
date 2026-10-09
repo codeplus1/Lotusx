@@ -24,6 +24,7 @@ export interface ColorPalette {
 }
 
 export type LogoMode = 'default' | 'uploaded' | 'custom';
+export type ThemeMode = 'system' | 'light' | 'dark';
 
 export interface ThemeConfig {
   palette: ColorPalette;
@@ -31,6 +32,7 @@ export interface ThemeConfig {
   customLogoUrl: string | null;
   customLogoName: string | null;
   presetId?: string;
+  themeMode?: ThemeMode;
   isCustomized: boolean;
 }
 
@@ -94,6 +96,7 @@ export const DEFAULT_THEME_CONFIG: ThemeConfig = {
   customLogoUrl: null,
   customLogoName: null,
   presetId: 'lotusx-cyan-light',
+  themeMode: 'light',
   isCustomized: false,
 };
 

@@ -29,11 +29,19 @@ import {
   Check,
   ExternalLink,
   X,
+  ChevronLeft,
+  ChevronRight,
+  Cloud,
 } from 'lucide-react';
 import { useVault } from '../../context/VaultContext';
 import { CATEGORY_METADATA, VaultRecord } from '../../types/vault';
 import { VAULT_CATEGORIES } from '../../core/constants';
 import { searchService } from '../../storage/SearchService';
+import {
+  backupReminderService,
+  GoogleDriveBackupStatus,
+} from '../../services/BackupReminderService';
+import { GoogleDriveBackupModal } from '../recovery/GoogleDriveBackupModal';
 import { DashboardSkeleton } from './DashboardSkeleton';
 
 const CATEGORY_ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
@@ -71,7 +79,34 @@ export const DashboardView: React.FC = () => {
 
   // Instant Domain & Account Title Search State
   const [quickFilterQuery, setQuickFilterQuery] = useState('');
+  const [recentPage, setRecentPage] = useState(1);
+  const RECENT_PAGE_SIZE = 5;
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Google Drive 30-Day Backup Reminder State
+  const [backupReminder, setBackupReminder] = useState<GoogleDriveBackupStatus | null>(null);
+  const [isDriveBackupModalOpen, setIsDriveBackupModalOpen] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    backupReminderService.evaluateBackupStatus().then((status) => {
+      if (isMounted) {
+        setBackupReminder(status);
+      }
+    });
+
+    const unsubscribe = backupReminderService.subscribe((status) => {
+      if (isMounted) {
+        setBackupReminder(status);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -86,10 +121,23 @@ export const DashboardView: React.FC = () => {
 
   const activeRecords = useMemo(() => records.filter((r) => !r.deletedAt), [records]);
   const favorites = useMemo(() => activeRecords.filter((r) => r.favorite), [activeRecords]);
-  const recentRecords = useMemo(
-    () => [...activeRecords].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 6),
+  const sortedRecentRecords = useMemo(
+    () => [...activeRecords].sort((a, b) => b.updatedAt - a.updatedAt),
     [activeRecords]
   );
+
+  const totalRecentPages = Math.max(1, Math.ceil(sortedRecentRecords.length / RECENT_PAGE_SIZE));
+
+  useEffect(() => {
+    if (recentPage > totalRecentPages) {
+      setRecentPage(totalRecentPages);
+    }
+  }, [recentPage, totalRecentPages]);
+
+  const recentRecords = useMemo(() => {
+    const start = (recentPage - 1) * RECENT_PAGE_SIZE;
+    return sortedRecentRecords.slice(start, start + RECENT_PAGE_SIZE);
+  }, [sortedRecentRecords, recentPage]);
 
   const filteredMatches = useMemo(() => {
     if (!quickFilterQuery.trim()) return [];
@@ -198,6 +246,66 @@ export const DashboardView: React.FC = () => {
         )}
       </AnimatePresence>
 
+      {/* Gentle Reminder: Google Drive Backup Older Than 30 Days */}
+      <AnimatePresence>
+        {backupReminder?.shouldRemind && (
+          <motion.div
+            id="gdrive-backup-reminder-banner"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, height: 0 }}
+            className="bg-bg-surface p-4 sm:p-5 rounded-xl border border-warning/40 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-warning/15 border border-warning/30 flex items-center justify-center text-warning shrink-0">
+                <Cloud className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm font-semibold text-text-primary">
+                    Time for a fresh cloud backup?
+                  </h3>
+                  {backupReminder.ageInDays !== null && (
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-warning/15 text-warning border border-warning/30 font-medium">
+                      {backupReminder.ageInDays} days ago
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  Your last Google Drive backup was created on{' '}
+                  <span className="font-medium text-text-primary">
+                    {backupReminder.lastBackupAt
+                      ? new Date(backupReminder.lastBackupAt).toLocaleDateString()
+                      : 'over 30 days ago'}
+                  </span>
+                  . Creating an updated encrypted snapshot helps keep your credentials safe across devices.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+              <button
+                type="button"
+                onClick={() => setIsDriveBackupModalOpen(true)}
+                className="btn-primary px-3.5 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+              >
+                <Cloud className="w-3.5 h-3.5" />
+                <span>Back Up Now</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => backupReminderService.dismissReminder()}
+                className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+                title="Remind me later"
+                aria-label="Dismiss backup reminder"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Unified Dashboard Header & Instant Lookup Card */}
       <div className="bg-bg-surface p-5 sm:p-6 rounded-xl border border-border shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
@@ -234,7 +342,7 @@ export const DashboardView: React.FC = () => {
               type="text"
               value={quickFilterQuery}
               onChange={(e) => setQuickFilterQuery(e.target.value)}
-              placeholder="Search credentials by domain (e.g. github.com) or account title..."
+              placeholder="Search credentials"
               className="w-full pl-10 pr-20 py-2.5 bg-bg-app border border-border rounded-xl text-xs sm:text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             />
             {quickFilterQuery ? (
@@ -583,6 +691,44 @@ export const DashboardView: React.FC = () => {
                 })}
               </div>
             )}
+
+            {sortedRecentRecords.length > RECENT_PAGE_SIZE && (
+              <div className="px-6 py-3.5 border-t border-border bg-bg-app/50 flex items-center justify-between gap-3">
+                <span className="text-xs text-text-secondary tabular-nums">
+                  Showing {(recentPage - 1) * RECENT_PAGE_SIZE + 1}–
+                  {Math.min(recentPage * RECENT_PAGE_SIZE, sortedRecentRecords.length)} of{' '}
+                  {sortedRecentRecords.length}
+                </span>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setRecentPage((p) => Math.max(1, p - 1))}
+                    disabled={recentPage <= 1}
+                    className="px-2.5 py-1.5 rounded-lg border border-border bg-bg-surface hover:bg-bg-secondary text-xs font-medium text-text-primary inline-flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Prev</span>
+                  </button>
+
+                  <span className="px-2.5 py-1 text-xs font-semibold text-text-primary tabular-nums">
+                    {recentPage} / {totalRecentPages}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => setRecentPage((p) => Math.min(totalRecentPages, p + 1))}
+                    disabled={recentPage >= totalRecentPages}
+                    className="px-2.5 py-1.5 rounded-lg border border-border bg-bg-surface hover:bg-bg-secondary text-xs font-medium text-text-primary inline-flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    aria-label="Next page"
+                  >
+                    <span>Next</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -624,6 +770,14 @@ export const DashboardView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <GoogleDriveBackupModal
+        isOpen={isDriveBackupModalOpen}
+        onClose={() => {
+          setIsDriveBackupModalOpen(false);
+          backupReminderService.evaluateBackupStatus().then(setBackupReminder);
+        }}
+      />
     </div>
   );
 };

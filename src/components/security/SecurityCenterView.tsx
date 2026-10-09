@@ -6,7 +6,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import {
-  ShieldAlert,
   ShieldCheck,
   AlertTriangle,
   Copy,
@@ -46,15 +45,11 @@ export const SecurityCenterView: React.FC = () => {
       {/* Top Hero Score Card */}
       <div className="bg-[#03152F] text-white rounded-xl p-6 sm:p-8 border border-[#1D3855] flex flex-col md:flex-row items-center justify-between gap-6 shadow-xs">
         <div className="space-y-2 text-center md:text-left">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[#062A63] border border-[#1D3855] text-[#08BBD4] text-xs font-mono">
-            <ShieldAlert className="w-3.5 h-3.5" />
-            Automated Vault Hygiene Analysis
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-            Credential Health & Vulnerability Report
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            Password Health Report
           </h1>
           <p className="text-xs sm:text-sm text-[#B8C6D8] max-w-xl leading-relaxed">
-            LotusX evaluates your encrypted credentials locally in memory for Shannon entropy, password reuse across domains, and credential rotation age.
+            Checks your saved passwords locally for weak, reused, or old passwords.
           </p>
         </div>
 
@@ -97,50 +92,68 @@ export const SecurityCenterView: React.FC = () => {
       </div>
 
       {/* Summary Metric Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-bg-surface p-5 rounded-xl border border-border shadow-xs flex items-center gap-4">
-          <div className="w-11 h-11 rounded-xl bg-error/10 text-error flex items-center justify-center shrink-0">
-            <AlertTriangle className="w-5 h-5" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-bg-surface p-4 sm:p-5 rounded-xl border border-border shadow-xs flex flex-col justify-between gap-3">
+          <div className="flex items-center justify-between">
+            <div className="w-10 h-10 rounded-xl bg-success/15 text-success flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <span className="text-2xl font-bold font-mono text-text-primary">
+              {securityReport.strongCount}
+            </span>
           </div>
-          <div>
-            <p className="text-2xl font-bold font-mono text-text-primary">{securityReport.weakCount}</p>
-            <p className="text-xs font-medium text-text-secondary">Weak Passwords (&lt;50 bits)</p>
-          </div>
+          <p className="text-xs font-medium text-text-secondary">Strong Passwords</p>
         </div>
 
-        <div className="bg-bg-surface p-5 rounded-xl border border-border shadow-xs flex items-center gap-4">
-          <div className="w-11 h-11 rounded-xl bg-warning/15 text-warning flex items-center justify-center shrink-0">
-            <Copy className="w-5 h-5" />
+        <div className="bg-bg-surface p-4 sm:p-5 rounded-xl border border-border shadow-xs flex flex-col justify-between gap-3">
+          <div className="flex items-center justify-between">
+            <div className="w-10 h-10 rounded-xl bg-error/10 text-error flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <span className="text-2xl font-bold font-mono text-text-primary">
+              {securityReport.weakCount}
+            </span>
           </div>
-          <div>
-            <p className="text-2xl font-bold font-mono text-text-primary">{securityReport.reusedCount}</p>
-            <p className="text-xs font-medium text-text-secondary">Reused Passwords</p>
-          </div>
+          <p className="text-xs font-medium text-text-secondary">Weak Passwords (&lt;50 bits)</p>
         </div>
 
-        <div className="bg-bg-surface p-5 rounded-xl border border-border shadow-xs flex items-center gap-4">
-          <div className="w-11 h-11 rounded-xl bg-info/15 text-info flex items-center justify-center shrink-0">
-            <Clock className="w-5 h-5" />
+        <div className="bg-bg-surface p-4 sm:p-5 rounded-xl border border-border shadow-xs flex flex-col justify-between gap-3">
+          <div className="flex items-center justify-between">
+            <div className="w-10 h-10 rounded-xl bg-warning/15 text-warning flex items-center justify-center shrink-0">
+              <Copy className="w-5 h-5" />
+            </div>
+            <span className="text-2xl font-bold font-mono text-text-primary">
+              {securityReport.reusedCount}
+            </span>
           </div>
-          <div>
-            <p className="text-2xl font-bold font-mono text-text-primary">{securityReport.oldCount}</p>
-            <p className="text-xs font-medium text-text-secondary">Unchanged &gt; 180 Days</p>
+          <p className="text-xs font-medium text-text-secondary">Reused Passwords</p>
+        </div>
+
+        <div className="bg-bg-surface p-4 sm:p-5 rounded-xl border border-border shadow-xs flex flex-col justify-between gap-3">
+          <div className="flex items-center justify-between">
+            <div className="w-10 h-10 rounded-xl bg-info/15 text-info flex items-center justify-center shrink-0">
+              <Clock className="w-5 h-5" />
+            </div>
+            <span className="text-2xl font-bold font-mono text-text-primary">
+              {securityReport.oldCount}
+            </span>
           </div>
+          <p className="text-xs font-medium text-text-secondary">Unchanged &gt; 180 Days</p>
         </div>
       </div>
 
       {/* Issue List */}
       <div className="bg-bg-surface rounded-xl border border-border shadow-xs overflow-hidden">
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
-          <h2 className="font-bold text-sm text-text-primary">
-            Actionable Security Recommendations ({securityReport.issues.length})
+        <div className="px-5 sm:px-6 py-4 border-b border-border flex items-center justify-between gap-3">
+          <h2 className="font-bold text-sm text-text-primary truncate">
+            Security Alerts ({securityReport.issues.length})
           </h2>
           <button
             onClick={() => setActiveView('generator')}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary-dark cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary-dark cursor-pointer whitespace-nowrap shrink-0"
           >
-            <KeyRound className="w-3.5 h-3.5" />
-            Open Password Generator
+            <KeyRound className="w-3.5 h-3.5 shrink-0" />
+            <span>Generator</span>
           </button>
         </div>
 

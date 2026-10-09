@@ -4,7 +4,8 @@
  */
 
 import { deflate, inflate } from 'pako';
-import { backupService } from '../storage/BackupService';
+import { backupService, RestoreBackupResult } from '../storage/BackupService';
+import { BackupIntegrityError } from '../core/errors';
 
 export interface RecoveryKitPayload {
   qrData: string;
@@ -20,6 +21,7 @@ export interface EmergencyKitData {
   qrPayload: string;
   qrDataUrl: string | null;
   fitsInQr: boolean;
+  isDisasterKeyOnly: boolean;
   payloadSizeBytes: number;
   recordCount: number;
   fingerprint: string;
@@ -28,7 +30,8 @@ export interface EmergencyKitData {
 }
 
 export class RecoveryKitService {
-  public static readonly QR_SAFE_CHAR_LIMIT = 2300;
+  // QR code Version 40 (L/M) safely encodes up to ~2,850 alphanumeric/byte characters
+  public static readonly QR_SAFE_CHAR_LIMIT = 2850;
 
   /**
    * Compresses text using pako deflate and converts to base64
@@ -156,6 +159,7 @@ export class RecoveryKitService {
       qrPayload: prepared.qrData,
       qrDataUrl: null,
       fitsInQr,
+      isDisasterKeyOnly: Boolean(prepared.isDisasterKeyOnly),
       payloadSizeBytes: new Blob([backupJson]).size,
       recordCount: prepared.recordCount,
       fingerprint,
@@ -192,19 +196,27 @@ export class RecoveryKitService {
       return trimmed;
     }
 
-    throw new Error(
+    throw new BackupIntegrityError(
       'Scanned QR code does not contain a valid LotusX encrypted recovery payload.'
     );
   }
 
   /**
-   * Restores an encrypted vault from a scanned QR code string and Master/Backup Password
+   * Restores an encrypted vault from a scanned QR code string and Master/Backup Password.
+   * Rejects header-only disaster keys if the user expects password records without accompanying .vault file,
+   * and returns the full decrypted RestoreBackupResult so the UI can unlock and display records immediately.
    */
   public async restoreFromQrPayload(
     scannedString: string,
     password: string
-  ): Promise<{ recordCount: number }> {
-    const backupJson = await this.parseScannedQr(scannedString);
+  ): Promise<RestoreBackupResult> {
+    const trimmed = scannedString.trim();
+    if (trimmed.startsWith('LOTUSX_KEY_V1:')) {
+      throw new BackupIntegrityError(
+        'This QR code is a large-vault header key (LOTUSX_KEY_V1) and does not contain the full credential records inside the optical barcode. Please restore using your accompanying .vault backup file or Google Drive backup.'
+      );
+    }
+    const backupJson = await this.parseScannedQr(trimmed);
     return await backupService.restoreEncryptedBackup(backupJson, password);
   }
 

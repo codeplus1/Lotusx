@@ -1516,6 +1516,220 @@ export class SecurityTestSuite {
       }
     );
 
+    // 29. Emergency Kit QR Roundtrip with Dedicated Backup Password & LOTUSX_KEY_V1 Protection
+    await runTest(
+      'emergency-kit-dedicated-password-qr',
+      'Emergency Kit QR Recovery with Dedicated Backup Password',
+      'RecoveryKit',
+      async () => {
+        const storage = new LocalSecureStorageService();
+        await storage.clear();
+        const repo = new VaultRepository(storage);
+        const backupSvc = new BackupService(repo);
+
+        const masterPw = 'MasterSecret#2026!Vault';
+        const dedicatedQrPw = 'DedicatedQrBackup#9988!';
+        const { cryptoKey } = await repo.createVault(masterPw, 'standard');
+
+        await repo.saveRecord(
+          {
+            id: 'rec_qr_ded_1',
+            type: 'login',
+            category: 'social',
+            title: 'ProtonMail Secure',
+            username: 'alice@proton.me',
+            password: 'UltraSecretProtonPassword!1',
+            website: 'https://mail.proton.me',
+            totpSecret: 'JBSWY3DPEHPK3PXP',
+            notes: 'Encrypted QR test note',
+            customFields: [{ id: 'cf_1', label: 'Recovery PIN', value: '849201', isHidden: true }],
+            tags: ['email'],
+            favorite: true,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+          cryptoKey
+        );
+
+        // Create backup re-encrypted under dedicatedQrPw
+        const backupJson = await backupSvc.createEncryptedBackup(cryptoKey, dedicatedQrPw);
+        const kitPayload = await recoveryKitService.prepareRecoveryKit(backupJson);
+
+        if (!kitPayload.isQrCompact || kitPayload.isDisasterKeyOnly) {
+          return {
+            passed: false,
+            message: 'Single-record vault unexpectedly fell back to disaster-key-only QR!',
+          };
+        }
+
+        // Verify zero plaintext leakage inside the QR payload
+        if (
+          kitPayload.qrData.includes('UltraSecretProtonPassword!1') ||
+          kitPayload.qrData.includes('alice@proton.me') ||
+          kitPayload.qrData.includes(dedicatedQrPw)
+        ) {
+          return {
+            passed: false,
+            message: 'CRITICAL: Plaintext secret leaked in QR payload!',
+          };
+        }
+
+        // Wipe storage and restore from QR payload using dedicatedQrPw
+        await storage.clear();
+        const extractedJson = await recoveryKitService.parseScannedQr(kitPayload.qrData);
+        const restored = await backupSvc.restoreEncryptedBackup(extractedJson, dedicatedQrPw);
+
+        if (
+          restored.recordCount !== 1 ||
+          restored.records.length !== 1 ||
+          restored.records[0].password !== 'UltraSecretProtonPassword!1' ||
+          restored.records[0].totpSecret !== 'JBSWY3DPEHPK3PXP' ||
+          restored.records[0].customFields?.[0]?.value !== '849201'
+        ) {
+          return {
+            passed: false,
+            message: 'Restored QR vault did not match original credentials and custom fields!',
+          };
+        }
+
+        // Verify LOTUSX_KEY_V1 is rejected when scanned as a standalone full-vault backup
+        let keyOnlyRejected = false;
+        try {
+          await recoveryKitService.restoreFromQrPayload('LOTUSX_KEY_V1:dummypayload', dedicatedQrPw);
+        } catch {
+          keyOnlyRejected = true;
+        }
+        if (!keyOnlyRejected) {
+          return {
+            passed: false,
+            message: 'LOTUSX_KEY_V1 was not rejected with a clear message when scanned without a .vault file!',
+          };
+        }
+
+        await storage.clear();
+        return {
+          passed: true,
+          message:
+            'Emergency Kit QR recovery with dedicated backup password and schema verification succeeded.',
+          details: `QR Length: ${kitPayload.qrData.length} chars, Records Restored: ${restored.recordCount}`,
+        };
+      }
+    );
+
+    // 30. Multi-Format RFC 4180 CSV Import & Zero-Knowledge Cloud Backup Envelope Verification
+    await runTest(
+      'rfc4180-csv-import-and-zk-envelope',
+      'RFC 4180 Multi-Format CSV Import & Zero-Knowledge Backup Verification',
+      'Backup',
+      async () => {
+        const storage = new LocalSecureStorageService();
+        const repo = new VaultRepository(storage);
+        const backupSvc = new BackupService(repo);
+
+        const sampleCsv = `\uFEFFname,url,username,password,note,totp
+"GitHub, Inc.",https://github.com,dev@lotusx.io,"My""Quoted,Pass!2026","Multiline
+note inside quotes",JBSWY3DPEHPK3PXP
+"AWS Console",https://console.aws.amazon.com,admin@lotusx.io,AwsRootSecret#99,,
+"GitHub, Inc.",https://github.com,dev@lotusx.io,"My""Quoted,Pass!2026","Duplicate row",JBSWY3DPEHPK3PXP`;
+
+        const report = await backupSvc.parseCsvImportWithReport(sampleCsv);
+        const gh = report.records.find((r) => r.title === 'GitHub, Inc.');
+
+        if (
+          report.importedCount !== 2 ||
+          report.duplicateCount !== 1 ||
+          !gh ||
+          gh.password !== 'My"Quoted,Pass!2026' ||
+          !gh.notes?.includes('Multiline\nnote inside quotes') ||
+          gh.totpSecret !== 'JBSWY3DPEHPK3PXP'
+        ) {
+          return {
+            passed: false,
+            message: `RFC 4180 CSV parser failed! Imported=${report.importedCount}, SkippedDup=${report.duplicateCount}`,
+          };
+        }
+
+        return {
+          passed: true,
+          message:
+            'RFC 4180 CSV import (UTF-8 BOM, multiline quotes, TOTP, duplicate detection) verified.',
+          details: `Imported: ${report.importedCount}, Duplicates Skipped: ${report.duplicateCount}`,
+        };
+      }
+    );
+
+    // 31. TOTP RFC 6238 Verification & Same-Vault Backup Restore Master Password Preservation
+    await runTest(
+      'totp-rfc6238-and-backup-password-preservation',
+      'TOTP 2FA Generation & Master Password Preservation Across Backup Restore',
+      'Crypto',
+      async () => {
+        const { totpService } = await import('./TotpService');
+        const validSecret = 'JBSWY3DPEHPK3PXP';
+        if (!totpService.isValidSecret(validSecret)) {
+          return { passed: false, message: 'Valid Base32 TOTP secret was rejected!' };
+        }
+        if (totpService.isValidSecret('INVALID_SECRET_!*@#')) {
+          return { passed: false, message: 'Malformed Base32 TOTP secret was accepted!' };
+        }
+
+        const totpResult = await totpService.generateCode(
+          'otpauth://totp/LotusX:alice@example.com?secret=JBSWY3DPEHPK3PXP&issuer=LotusX&digits=6&period=30'
+        );
+        if (!totpResult || !/^\d{6}$/.test(totpResult.code)) {
+          return { passed: false, message: `Expected 6-digit TOTP code, got ${totpResult?.code}` };
+        }
+
+        // Verify that restoring a backup encrypted with a separate backupPassword onto the same local vault
+        // preserves the user's original Master Password unlock capability
+        const storage = new LocalSecureStorageService();
+        await storage.clear();
+        const repo = new VaultRepository(storage);
+        const backupSvc = new BackupService(repo);
+
+        const originalMasterPw = 'MyPrimaryMasterPassword!2026';
+        const customBackupPw = 'SeparateCloudBackupPassword!99';
+        const { cryptoKey } = await repo.createVault(originalMasterPw, 'standard');
+
+        await repo.saveRecord(
+          {
+            id: 'rec_preserve_1',
+            type: 'login',
+            category: 'banking',
+            title: 'Chase Checking',
+            username: 'chase_user',
+            password: 'ChaseSecretPassword!1',
+            favorite: false,
+            tags: [],
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+          cryptoKey
+        );
+
+        const backupWithCustomPw = await backupSvc.createEncryptedBackup(cryptoKey, customBackupPw);
+        await backupSvc.restoreEncryptedBackup(backupWithCustomPw, customBackupPw);
+
+        // Lock and verify original Master Password still unlocks the vault
+        repo.setActiveKey(null);
+        const unlocked = await repo.unlockWithPassword(originalMasterPw);
+        if (!unlocked.cryptoKey || unlocked.records.length !== 1) {
+          return {
+            passed: false,
+            message: 'Original Master Password failed to unlock vault after restoring custom-password backup!',
+          };
+        }
+
+        await storage.clear();
+        return {
+          passed: true,
+          message:
+            'TOTP RFC 6238 generation and Master Password preservation across custom-password backups verified.',
+          details: `TOTP Code: ${totpResult.code} (${totpResult.remainingSeconds}s remaining)`,
+        };
+      }
+    );
+
     return results;
   }
 }

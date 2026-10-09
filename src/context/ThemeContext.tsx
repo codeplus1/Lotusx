@@ -7,6 +7,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import {
   ColorPalette,
   LogoMode,
+  ThemeMode,
   ThemeConfig,
   DEFAULT_THEME_CONFIG,
   DEFAULT_PALETTE,
@@ -23,11 +24,13 @@ interface ThemeContextType {
   customLogoUrl: string | null;
   customLogoName: string | null;
   presetId?: string;
+  themeMode: ThemeMode;
   isCustomized: boolean;
   isSaved: boolean;
   isDark: boolean;
   toggleDarkMode: () => void;
   setDarkMode: (dark: boolean) => void;
+  setThemeMode: (mode: ThemeMode) => void;
   updateColor: (key: keyof ColorPalette, value: string) => void;
   applyPreset: (presetId: string) => void;
   setLogoMode: (mode: LogoMode) => void;
@@ -38,6 +41,11 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
+
+function isSystemDarkPreferred(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
 
 function loadSavedTheme(): ThemeConfig {
   if (typeof window === 'undefined') return DEFAULT_THEME_CONFIG;
@@ -58,6 +66,25 @@ function loadSavedTheme(): ThemeConfig {
         return DEFAULT_THEME_CONFIG;
       }
 
+      const savedMode: ThemeMode | undefined =
+        parsed.themeMode === 'system' || parsed.themeMode === 'light' || parsed.themeMode === 'dark'
+          ? parsed.themeMode
+          : undefined;
+
+      if (savedMode === 'system') {
+        const sysDark = isSystemDarkPreferred();
+        const sysTokens = sysDark ? DARK_PALETTE : DEFAULT_PALETTE;
+        return {
+          palette: { ...sysTokens },
+          logoMode: parsed.logoMode || 'default',
+          customLogoUrl: parsed.customLogoUrl || null,
+          customLogoName: parsed.customLogoName || null,
+          presetId: sysDark ? 'lotusx-cyan-dark' : 'lotusx-cyan-light',
+          themeMode: 'system',
+          isCustomized: false,
+        };
+      }
+
       const bgLum = getLuminance(parsed.palette.background || DEFAULT_PALETTE.background);
       const baseTokens = bgLum < 0.2 ? DARK_PALETTE : DEFAULT_PALETTE;
 
@@ -70,6 +97,7 @@ function loadSavedTheme(): ThemeConfig {
         customLogoUrl: parsed.customLogoUrl || null,
         customLogoName: parsed.customLogoName || null,
         presetId: parsed.presetId || (bgLum < 0.2 ? 'lotusx-cyan-dark' : 'lotusx-cyan-light'),
+        themeMode: savedMode || (bgLum < 0.2 ? 'dark' : 'light'),
         isCustomized: !!parsed.isCustomized,
       };
     }
@@ -94,25 +122,57 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [config]);
 
   const isDark = getLuminance(config.palette.background || DEFAULT_PALETTE.background) < 0.2;
+  const themeMode: ThemeMode = config.themeMode || (isDark ? 'dark' : 'light');
 
-  const setDarkMode = useCallback((dark: boolean) => {
+  // Listen for OS prefers-color-scheme changes when themeMode === 'system'
+  useEffect(() => {
+    if (themeMode !== 'system' || typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      const nextPalette = e.matches ? DARK_PALETTE : DEFAULT_PALETTE;
+      setConfig((prev) => ({
+        ...prev,
+        palette: { ...nextPalette },
+        presetId: e.matches ? 'lotusx-cyan-dark' : 'lotusx-cyan-light',
+        themeMode: 'system',
+        isCustomized: false,
+      }));
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [themeMode]);
+
+  const setThemeMode = useCallback((mode: ThemeMode) => {
     setConfig((prev) => {
-      const nextPalette = dark ? DARK_PALETTE : DEFAULT_PALETTE;
+      const targetDark = mode === 'system' ? isSystemDarkPreferred() : mode === 'dark';
+      const nextPalette = targetDark ? DARK_PALETTE : DEFAULT_PALETTE;
       const nextConfig: ThemeConfig = {
         ...prev,
         palette: { ...nextPalette },
-        presetId: dark ? 'lotusx-cyan-dark' : 'lotusx-cyan-light',
+        presetId: targetDark ? 'lotusx-cyan-dark' : 'lotusx-cyan-light',
+        themeMode: mode,
         isCustomized: false,
       };
       try {
         localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(nextConfig));
       } catch (err) {
-        console.warn('Failed to persist dark mode:', err);
+        console.warn('Failed to persist theme mode:', err);
       }
       setIsSaved(true);
       return nextConfig;
     });
   }, []);
+
+  const setDarkMode = useCallback(
+    (dark: boolean) => {
+      setThemeMode(dark ? 'dark' : 'light');
+    },
+    [setThemeMode]
+  );
 
   const toggleDarkMode = useCallback(() => {
     setDarkMode(!isDark);
@@ -247,11 +307,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         customLogoUrl: config.customLogoUrl,
         customLogoName: config.customLogoName,
         presetId: config.presetId,
+        themeMode,
         isCustomized: config.isCustomized,
         isSaved,
         isDark,
         toggleDarkMode,
         setDarkMode,
+        setThemeMode,
         updateColor,
         applyPreset,
         setLogoMode,

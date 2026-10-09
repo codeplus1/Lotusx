@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Lock, Unlock, Eye, EyeOff, AlertCircle, Upload, Trash2, RefreshCw, Fingerprint, CloudDownload, QrCode } from 'lucide-react';
+import { Lock, Unlock, Eye, EyeOff, AlertCircle, Upload, RefreshCw, Fingerprint, CloudDownload, QrCode } from 'lucide-react';
 import { useVault } from '../../context/VaultContext';
 import { LotusXLogo } from '../common/LotusXLogo';
 import { biometricService } from '../../security/BiometricService';
@@ -21,7 +21,7 @@ export const UnlockVaultScreen: React.FC<UnlockVaultScreenProps> = ({
   onRestoreFromGoogleDrive,
   onScanRecoveryKitQr,
 }) => {
-  const { unlock, wipeVault } = useVault();
+  const { unlock } = useVault();
 
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -33,7 +33,6 @@ export const UnlockVaultScreen: React.FC<UnlockVaultScreenProps> = ({
   const [platformBioLabel, setPlatformBioLabel] = useState('Fingerprint / Face ID');
   const [error, setError] = useState<string | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   useEffect(() => {
     const enabled = biometricService.isBiometricEnabled();
@@ -83,7 +82,9 @@ export const UnlockVaultScreen: React.FC<UnlockVaultScreenProps> = ({
 
     await new Promise((r) => setTimeout(r, 60));
 
-    if (enableBiometricsAfterUnlock && !hasBiometrics) {
+    const result = await unlock(password);
+
+    if (result.success && enableBiometricsAfterUnlock && !hasBiometrics) {
       try {
         await biometricService.enableBiometricUnlock(password);
         setHasBiometrics(true);
@@ -92,7 +93,6 @@ export const UnlockVaultScreen: React.FC<UnlockVaultScreenProps> = ({
       }
     }
 
-    const result = await unlock(password);
     setIsUnlocking(false);
 
     if (!result.success) {
@@ -102,11 +102,6 @@ export const UnlockVaultScreen: React.FC<UnlockVaultScreenProps> = ({
       }
       setPassword('');
     }
-  };
-
-  const handleResetVault = async () => {
-    await wipeVault();
-    setShowResetConfirm(false);
   };
 
   return (
@@ -132,7 +127,7 @@ export const UnlockVaultScreen: React.FC<UnlockVaultScreenProps> = ({
           </div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Vault Locked</h1>
           <p className="text-xs text-[#B8C6D8] mt-1">
-            Enter your Master Password to derive your decryption key in memory
+            Enter your Master Password to unlock.
           </p>
         </div>
 
@@ -240,77 +235,40 @@ export const UnlockVaultScreen: React.FC<UnlockVaultScreenProps> = ({
           )}
         </form>
 
-        {/* Secondary Recovery & Reset Actions */}
+        {/* Secondary Recovery Actions */}
         <div className="mt-6 pt-5 border-t border-[#1D3855] flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-y-3.5 gap-x-4 text-xs items-center">
+          <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-4 text-xs">
             <button
               type="button"
               onClick={onRestoreBackup}
-              className="inline-flex items-center gap-1.5 text-[#B8C6D8] hover:text-white transition-colors cursor-pointer justify-self-start"
+              className="inline-flex items-center gap-1.5 text-[#B8C6D8] hover:text-white transition-colors cursor-pointer"
             >
               <Upload className="w-3.5 h-3.5 text-[#08BBD4] shrink-0" />
               <span>Restore .vault File</span>
             </button>
 
-            {onRestoreFromGoogleDrive ? (
+            {onRestoreFromGoogleDrive && (
               <button
                 type="button"
                 onClick={onRestoreFromGoogleDrive}
-                className="inline-flex items-center gap-1.5 text-[#B8C6D8] hover:text-white transition-colors cursor-pointer justify-self-end"
+                className="inline-flex items-center gap-1.5 text-[#B8C6D8] hover:text-white transition-colors cursor-pointer"
               >
                 <CloudDownload className="w-3.5 h-3.5 text-[#08BBD4] shrink-0" />
                 <span>Google Drive</span>
               </button>
-            ) : (
-              <div />
             )}
 
-            {onScanRecoveryKitQr ? (
+            {onScanRecoveryKitQr && (
               <button
                 type="button"
                 onClick={onScanRecoveryKitQr}
-                className="inline-flex items-center gap-1.5 text-[#B8C6D8] hover:text-white transition-colors cursor-pointer justify-self-start"
+                className="inline-flex items-center gap-1.5 text-[#B8C6D8] hover:text-white transition-colors cursor-pointer"
               >
                 <QrCode className="w-3.5 h-3.5 text-[#08BBD4] shrink-0" />
                 <span>Scan QR Kit</span>
               </button>
-            ) : (
-              <div />
             )}
-
-            <button
-              type="button"
-              onClick={() => setShowResetConfirm(!showResetConfirm)}
-              className="inline-flex items-center gap-1.5 text-[#8493A5] hover:text-[#D64545] transition-colors cursor-pointer justify-self-end"
-            >
-              <Trash2 className="w-3.5 h-3.5 shrink-0" />
-              <span>Wipe Vault</span>
-            </button>
           </div>
-
-          {showResetConfirm && (
-            <div className="p-3.5 rounded-xl bg-[#D64545]/10 border border-[#D64545]/30 space-y-2.5 text-xs">
-              <p className="text-[#F5F9FF] font-medium">
-                Permanently erase local encrypted vault? This cannot be undone without a backup.
-              </p>
-              <div className="flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowResetConfirm(false)}
-                  className="px-3 py-1.5 rounded-lg bg-[#0B1F38] text-[#B8C6D8] hover:text-white cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleResetVault}
-                  className="btn-danger px-3 py-1.5 rounded-lg cursor-pointer"
-                >
-                  Confirm Wipe
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </motion.div>
 

@@ -16,16 +16,19 @@ import {
   ShieldCheck,
   FileKey,
   Calendar,
+  Trash2,
 } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { googleDriveService, DriveBackupFileMetadata } from '../../services/GoogleDriveBackupService';
-import { backupService } from '../../storage/BackupService';
+import { backupReminderService } from '../../services/BackupReminderService';
+import { backupService, RestoreBackupResult } from '../../storage/BackupService';
+import { useVault } from '../../context/VaultContext';
 
 interface GoogleDriveBackupModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultBackupPassword?: string;
-  onRestoreSuccess?: (recordCount: number) => void;
+  onRestoreSuccess?: (recordCount: number, restored?: RestoreBackupResult) => void;
 }
 
 export const GoogleDriveBackupModal: React.FC<GoogleDriveBackupModalProps> = ({
@@ -34,7 +37,9 @@ export const GoogleDriveBackupModal: React.FC<GoogleDriveBackupModalProps> = ({
   defaultBackupPassword = '',
   onRestoreSuccess,
 }) => {
+  const { applyRestoredVault, records } = useVault();
   const [isConnected, setIsConnected] = useState(false);
+  const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [backups, setBackups] = useState<DriveBackupFileMetadata[]>([]);
   const [isLoadingBackups, setIsLoadingBackups] = useState(false);
@@ -47,6 +52,7 @@ export const GoogleDriveBackupModal: React.FC<GoogleDriveBackupModalProps> = ({
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [restorePassword, setRestorePassword] = useState('');
   const [isRestoring, setIsRestoring] = useState(false);
+  const [confirmOverwrite, setConfirmOverwrite] = useState(false);
 
   const [statusMessage, setStatusMessage] = useState<{
     type: 'success' | 'error';
@@ -61,8 +67,13 @@ export const GoogleDriveBackupModal: React.FC<GoogleDriveBackupModalProps> = ({
       setBackups(list);
       if (list.length > 0 && !selectedFileId) {
         setSelectedFileId(list[0].id);
+      } else if (list.length === 0) {
+        setSelectedFileId(null);
       }
     } catch (err: unknown) {
+      if (!googleDriveService.isAuthenticated()) {
+        setIsConnected(false);
+      }
       setStatusMessage({
         type: 'error',
         text: err instanceof Error ? err.message : 'Failed to fetch backups from Google Drive.',
@@ -75,8 +86,10 @@ export const GoogleDriveBackupModal: React.FC<GoogleDriveBackupModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setStatusMessage(null);
+      setConfirmOverwrite(false);
       const authed = googleDriveService.isAuthenticated();
       setIsConnected(authed);
+      setConnectedEmail(googleDriveService.getUserProfile().email);
       if (authed) {
         fetchBackups();
       }
@@ -89,6 +102,7 @@ export const GoogleDriveBackupModal: React.FC<GoogleDriveBackupModalProps> = ({
     try {
       await googleDriveService.authenticate();
       setIsConnected(true);
+      setConnectedEmail(googleDriveService.getUserProfile().email);
       await fetchBackups();
     } catch (err: unknown) {
       setStatusMessage({
@@ -100,12 +114,34 @@ export const GoogleDriveBackupModal: React.FC<GoogleDriveBackupModalProps> = ({
     }
   };
 
-  const handleDisconnect = () => {
-    googleDriveService.disconnect();
+  const handleDisconnect = async () => {
+    await googleDriveService.disconnect();
     setIsConnected(false);
+    setConnectedEmail(null);
     setBackups([]);
     setSelectedFileId(null);
     setStatusMessage(null);
+  };
+
+  const handleDeleteBackupFile = async (fileId: string, fileName: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await googleDriveService.deleteBackup(fileId);
+      setStatusMessage({
+        type: 'success',
+        text: `Deleted cloud backup "${fileName}" from Google Drive.`,
+      });
+      if (selectedFileId === fileId) {
+        setSelectedFileId(null);
+      }
+      await fetchBackups();
+    } catch (err: unknown) {
+      setStatusMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to delete backup from Google Drive.',
+      });
+    }
   };
 
   const handleUploadEncryptedBackup = async (e: React.FormEvent) => {
@@ -123,9 +159,10 @@ export const GoogleDriveBackupModal: React.FC<GoogleDriveBackupModalProps> = ({
     try {
       const jsonString = await backupService.createEncryptedBackupString(backupPassword);
       const uploaded = await googleDriveService.uploadEncryptedBackup(jsonString);
+      backupReminderService.recordSuccessfulDriveBackup(new Date().toISOString(), uploaded.name);
       setStatusMessage({
         type: 'success',
-        text: `Encrypted backup "${uploaded.name}" uploaded to Google Drive!`,
+        text: `Encrypted zero-knowledge backup "${uploaded.name}" uploaded to Google Drive!`,
       });
       setBackupPassword('');
       await fetchBackups();
@@ -146,18 +183,26 @@ export const GoogleDriveBackupModal: React.FC<GoogleDriveBackupModalProps> = ({
     e.preventDefault();
     if (!selectedFileId || !restorePassword) return;
 
+    const activeLocalRecords = records.filter((r) => !r.deletedAt).length;
+    if (activeLocalRecords > 0 && !confirmOverwrite) {
+      setConfirmOverwrite(true);
+      return;
+    }
+
     setIsRestoring(true);
     setStatusMessage(null);
     try {
       const encryptedContent = await googleDriveService.downloadEncryptedBackup(selectedFileId);
       const result = await backupService.restoreEncryptedBackup(encryptedContent, restorePassword);
+      applyRestoredVault(result);
       setStatusMessage({
         type: 'success',
         text: `Successfully decrypted and restored ${result.recordCount} credentials from Google Drive!`,
       });
       setRestorePassword('');
+      setConfirmOverwrite(false);
       if (onRestoreSuccess) {
-        onRestoreSuccess(result.recordCount);
+        onRestoreSuccess(result.recordCount, result);
       }
     } catch (err: unknown) {
       setStatusMessage({
@@ -188,7 +233,7 @@ export const GoogleDriveBackupModal: React.FC<GoogleDriveBackupModalProps> = ({
             <strong className="font-bold text-text-primary block mb-0.5">
               End-to-End Encrypted Before Upload
             </strong>
-            Your vault is encrypted locally on your device using AES-256-GCM and PBKDF2-SHA256 (600,000 iterations) before touching Google Drive. Google never sees your Master Password or plaintext data.
+            Your vault is encrypted locally on your device using AES-256-GCM and Argon2id before touching Google Drive. Google never sees your Master Password or plaintext data.
           </div>
         </div>
 
@@ -247,7 +292,9 @@ export const GoogleDriveBackupModal: React.FC<GoogleDriveBackupModalProps> = ({
             <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-bg-secondary border border-border">
               <div className="flex items-center gap-2 text-xs font-semibold text-text-primary">
                 <span className="w-2 h-2 rounded-full bg-success" />
-                Google Drive Connected (drive.file scope)
+                <span>
+                  Google Drive Connected{connectedEmail ? ` (${connectedEmail})` : ' (drive.file scope)'}
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -368,10 +415,20 @@ export const GoogleDriveBackupModal: React.FC<GoogleDriveBackupModalProps> = ({
                               <FileKey className="w-3.5 h-3.5 text-primary shrink-0" />
                               <span className="truncate text-[11px]">{file.name}</span>
                             </div>
-                            <span className="text-[10px] text-text-muted shrink-0 ml-2 flex items-center gap-1">
-                              <Calendar className="w-2.5 h-2.5" />
-                              {new Date(file.createdTime).toLocaleDateString()}
-                            </span>
+                            <div className="flex items-center gap-2 shrink-0 ml-2">
+                              <span className="text-[10px] text-text-muted flex items-center gap-1">
+                                <Calendar className="w-2.5 h-2.5" />
+                                {new Date(file.createdTime).toLocaleDateString()}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeleteBackupFile(file.id, file.name, e)}
+                                className="p-1 rounded hover:bg-error/15 text-text-muted hover:text-error transition-colors cursor-pointer"
+                                title="Delete cloud backup from Google Drive"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
                           </label>
                         ))}
                       </div>
@@ -386,11 +443,21 @@ export const GoogleDriveBackupModal: React.FC<GoogleDriveBackupModalProps> = ({
                       <input
                         type="password"
                         value={restorePassword}
-                        onChange={(e) => setRestorePassword(e.target.value)}
+                        onChange={(e) => {
+                          setRestorePassword(e.target.value);
+                          setConfirmOverwrite(false);
+                        }}
                         placeholder="Password used for this backup..."
                         className="w-full px-3 py-2 rounded-lg border border-border bg-bg-surface text-text-primary text-xs font-mono focus:outline-none focus:border-primary"
                         required
                       />
+                    </div>
+                  )}
+
+                  {confirmOverwrite && (
+                    <div className="p-2.5 rounded-lg bg-warning/15 border border-warning/30 text-[11px] text-text-primary">
+                      <strong className="text-warning block">Confirm Vault Replacement:</strong>
+                      Restoring this cloud backup will replace your {records.filter((r) => !r.deletedAt).length} current local records. Click below again to confirm.
                     </div>
                   )}
                 </div>
@@ -404,6 +471,11 @@ export const GoogleDriveBackupModal: React.FC<GoogleDriveBackupModalProps> = ({
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                       Downloading & Decrypting...
+                    </>
+                  ) : confirmOverwrite ? (
+                    <>
+                      <CloudDownload className="w-3.5 h-3.5 text-warning" />
+                      Confirm Replace & Restore Vault
                     </>
                   ) : (
                     <>

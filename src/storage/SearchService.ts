@@ -157,12 +157,21 @@ export class SearchService implements ISearchService {
         return domainMatch;
       }
 
-      // Default 'all': checks title, domain, username, website, tags, category
-      const userMatch = Boolean(rec.username?.toLowerCase().includes(trimmed));
-      const tagMatch = Boolean(rec.tags?.some((t) => t.toLowerCase().includes(trimmed)));
+      // Default 'all': checks title, domain, username, website, category, and category-specific non-secret metadata
+      const userMatch = Boolean(
+        rec.username?.toLowerCase().includes(trimmed) ||
+          rec.email?.toLowerCase().includes(trimmed) ||
+          rec.bankName?.toLowerCase().includes(trimmed) ||
+          rec.issuingBank?.toLowerCase().includes(trimmed) ||
+          rec.cardholderName?.toLowerCase().includes(trimmed) ||
+          rec.accountHolderName?.toLowerCase().includes(trimmed) ||
+          rec.identityDetails?.fullName?.toLowerCase().includes(trimmed) ||
+          rec.identityDetails?.documentType?.toLowerCase().includes(trimmed) ||
+          rec.wifiDetails?.ssid?.toLowerCase().includes(trimmed)
+      );
       const categoryMatch = Boolean(rec.category?.toLowerCase().includes(trimmed));
 
-      return titleMatch || domainMatch || userMatch || tagMatch || categoryMatch;
+      return titleMatch || domainMatch || userMatch || categoryMatch;
     });
   }
 }

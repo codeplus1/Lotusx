@@ -71,7 +71,16 @@ export const RecordListView: React.FC = () => {
 
   const handleQuickCopy = (e: React.MouseEvent, record: VaultRecord) => {
     e.stopPropagation();
-    const secret = record.password || record.cardNumber || record.accountNumber || record.username || '';
+    const secret =
+      record.password ||
+      record.wifiDetails?.password ||
+      record.cardNumber?.replace(/\s+/g, '') ||
+      record.cardDetails?.cardNumber?.replace(/\s+/g, '') ||
+      record.accountNumber ||
+      record.bankDetails?.accountNumber ||
+      record.identityDetails?.documentNumber ||
+      record.username ||
+      '';
     if (secret) {
       copyToClipboard(secret, `quick-${record.id}`);
     }
@@ -84,68 +93,70 @@ export const RecordListView: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full space-y-4">
-      {/* Search and Filter Controls */}
-      <div className="bg-bg-surface p-3.5 sm:p-4 rounded-xl border border-border shadow-xs space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <h2 className="text-base sm:text-lg font-bold text-text-primary tracking-tight">
-              {getHeaderTitle()}
-            </h2>
-            <p className="text-xs text-text-secondary">
-              Showing {filteredRecords.length} {filteredRecords.length === 1 ? 'record' : 'records'}
-            </p>
-          </div>
+      {/* Search and Filter Controls (hidden on Favorites screen) */}
+      {selectedCategory !== 'favorites' && (
+        <div className="bg-bg-surface p-3.5 sm:p-4 rounded-xl border border-border shadow-xs space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-text-primary tracking-tight">
+                {getHeaderTitle()}
+              </h2>
+              <p className="text-xs text-text-secondary">
+                Showing {filteredRecords.length} {filteredRecords.length === 1 ? 'record' : 'records'}
+              </p>
+            </div>
 
-          {selectedCategory !== 'trash' && (
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="btn-primary inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs cursor-pointer shadow-xs shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              <span>New Item</span>
-            </button>
-          )}
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-2.5">
-          {/* Search Input */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-text-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by title, username, URL, or tag..."
-              className="w-full pl-9 pr-4 py-2 bg-bg-app border border-border rounded-lg text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-            />
-            {searchQuery && (
+            {selectedCategory !== 'trash' && (
               <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-text-muted hover:text-text-primary px-1.5 py-0.5 rounded bg-bg-secondary cursor-pointer"
+                onClick={() => setIsCreateModalOpen(true)}
+                className="btn-primary inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs cursor-pointer shadow-xs shrink-0"
               >
-                Clear
+                <Plus className="w-4 h-4" />
+                <span>New Item</span>
               </button>
             )}
           </div>
 
-          {/* Sort Dropdown */}
-          <div className="flex items-center gap-1.5 bg-bg-app border border-border rounded-lg px-3 py-2 sm:py-1.5 shrink-0">
-            <ArrowUpDown className="w-3.5 h-3.5 text-text-secondary shrink-0" />
-            <span className="text-[11px] text-text-secondary font-medium">Sort:</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="bg-transparent text-xs font-semibold text-text-primary focus:outline-none cursor-pointer flex-1 sm:flex-initial"
-            >
-              <option value="updated_desc">Recently Updated</option>
-              <option value="created_desc">Newest First</option>
-              <option value="title_asc">Title (A-Z)</option>
-              <option value="title_desc">Title (Z-A)</option>
-              <option value="strength_asc">Weakest Password First</option>
-            </select>
+          <div className="flex flex-col sm:flex-row gap-2.5">
+            {/* Search Input */}
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-text-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search credentials"
+                className="w-full pl-9 pr-4 py-2 bg-bg-app border border-border rounded-lg text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-text-muted hover:text-text-primary px-1.5 py-0.5 rounded bg-bg-secondary cursor-pointer"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {/* Sort Dropdown */}
+            <div className="flex items-center gap-1.5 bg-bg-app border border-border rounded-lg px-3 py-2 sm:py-1.5 shrink-0">
+              <ArrowUpDown className="w-3.5 h-3.5 text-text-secondary shrink-0" />
+              <span className="text-[11px] text-text-secondary font-medium">Sort:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                className="bg-transparent text-xs font-semibold text-text-primary focus:outline-none cursor-pointer flex-1 sm:flex-initial"
+              >
+                <option value="updated_desc">Recently Updated</option>
+                <option value="created_desc">Newest First</option>
+                <option value="title_asc">Title (A-Z)</option>
+                <option value="title_desc">Title (Z-A)</option>
+                <option value="strength_asc">Weakest Password First</option>
+              </select>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Record List */}
       <div className="bg-bg-surface rounded-xl border border-border shadow-xs overflow-hidden flex-1">
@@ -172,27 +183,49 @@ export const RecordListView: React.FC = () => {
               const isWeak = rec.password && (rec.strengthScore ?? 3) <= 1;
               const q = searchQuery.trim().toLowerCase();
 
+              const rawCardNum = (rec.cardNumber || rec.cardDetails?.cardNumber || '').replace(
+                /\D/g,
+                ''
+              );
+              const maskedCardSummary =
+                rawCardNum.length >= 4
+                  ? `${rec.cardNetwork || rec.cardDetails?.cardNetwork || 'Card'} •••• ${rawCardNum.slice(-4)}`
+                  : undefined;
+
+              const identitySummary = rec.identityDetails
+                ? [rec.identityDetails.documentType, rec.identityDetails.fullName]
+                    .filter(Boolean)
+                    .join(' • ')
+                : undefined;
+
+              const wifiSummary = rec.wifiDetails?.ssid
+                ? `SSID: ${rec.wifiDetails.ssid}`
+                : undefined;
+
               const matchedSecondaryField = q
-                ? [rec.username, rec.email, rec.bankName, rec.url, rec.website].find(
-                    (f) => f && f.toLowerCase().includes(q)
-                  )
+                ? [
+                    rec.username,
+                    rec.email,
+                    rec.bankName,
+                    rec.issuingBank,
+                    rec.cardholderName,
+                    rec.identityDetails?.fullName,
+                    rec.wifiDetails?.ssid,
+                    rec.url,
+                    rec.website,
+                  ].find((f) => f && f.toLowerCase().includes(q))
                 : undefined;
               const secondaryText =
                 matchedSecondaryField ||
+                maskedCardSummary ||
+                wifiSummary ||
+                identitySummary ||
                 rec.username ||
                 rec.email ||
                 rec.bankName ||
                 rec.url ||
                 rec.website ||
                 meta.label;
-
-              const sortedTags = q
-                ? [...rec.tags].sort((a, b) => {
-                    const aMatch = a.toLowerCase().includes(q) ? 0 : 1;
-                    const bMatch = b.toLowerCase().includes(q) ? 0 : 1;
-                    return aMatch - bMatch;
-                  })
-                : rec.tags;
 
               return (
                 <div
@@ -230,25 +263,20 @@ export const RecordListView: React.FC = () => {
                         <span className="truncate">
                           {highlightMatch(secondaryText, searchQuery)}
                         </span>
-                        {sortedTags.length > 0 && (
-                          <div className="hidden md:flex items-center gap-1">
-                            {sortedTags.slice(0, 2).map((t) => (
-                              <span
-                                key={t}
-                                className="px-1.5 py-0.2 rounded bg-bg-secondary text-text-secondary text-[10px] font-mono border border-border"
-                              >
-                                #{highlightMatch(t, searchQuery)}
-                              </span>
-                            ))}
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
 
                   {/* Quick Actions */}
                   <div className="flex items-center gap-1 shrink-0">
-                    {(rec.password || rec.cardNumber || rec.accountNumber) && !rec.deletedAt && (
+                    {(rec.password ||
+                      rec.wifiDetails?.password ||
+                      rec.cardNumber ||
+                      rec.cardDetails?.cardNumber ||
+                      rec.accountNumber ||
+                      rec.bankDetails?.accountNumber ||
+                      rec.identityDetails?.documentNumber) &&
+                      !rec.deletedAt && (
                       <button
                         onClick={(e) => handleQuickCopy(e, rec)}
                         title="Copy secret to clipboard (auto-clears in 20s)"

@@ -17,6 +17,7 @@ import { VaultStatus } from '../types/auth';
 import { DEFAULT_SETTINGS, STORAGE_KEYS } from '../core/constants';
 import { vaultRepository } from '../storage/VaultRepository';
 import { secureStorageService } from '../storage/SecureStorageService';
+import { RestoreBackupResult } from '../storage/BackupService';
 import { clipboardService } from '../security/ClipboardService';
 import { passwordChangeDetectionService } from '../security/PasswordChangeDetectionService';
 import { passwordHealthService } from '../security/PasswordHealthService';
@@ -102,6 +103,7 @@ interface VaultContextType {
   toggleFavorite: (id: string) => Promise<void>;
   duplicateRecord: (record: VaultRecord) => Promise<void>;
   importMultipleRecords: (imported: VaultRecord[] | Promise<VaultRecord[]>) => Promise<number>;
+  applyRestoredVault: (restored: RestoreBackupResult) => void;
   updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
   copySecretToClipboard: (secret: string) => Promise<boolean>;
   copyToClipboard: (secret: string, fieldLabel?: string) => Promise<boolean>;
@@ -433,13 +435,21 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           (r.website && r.website.toLowerCase().includes(q)) ||
           (r.url && r.url.toLowerCase().includes(q)) ||
           (r.bankName && r.bankName.toLowerCase().includes(q)) ||
-          r.tags.some((t) => t.toLowerCase().includes(q))
+          (r.issuingBank && r.issuingBank.toLowerCase().includes(q)) ||
+          (r.cardholderName && r.cardholderName.toLowerCase().includes(q)) ||
+          (r.accountHolderName && r.accountHolderName.toLowerCase().includes(q)) ||
+          (r.identityDetails?.fullName && r.identityDetails.fullName.toLowerCase().includes(q)) ||
+          (r.identityDetails?.documentType &&
+            r.identityDetails.documentType.toLowerCase().includes(q)) ||
+          (r.wifiDetails?.ssid && r.wifiDetails.ssid.toLowerCase().includes(q))
       );
     }
 
     list.sort((a, b) => {
       if (sortBy === 'title_asc') return a.title.localeCompare(b.title);
       if (sortBy === 'title_desc') return b.title.localeCompare(a.title);
+      if (sortBy === 'created_desc') return b.createdAt - a.createdAt;
+      if (sortBy === 'strength_asc') return (a.strengthScore ?? 4) - (b.strengthScore ?? 4);
       if (sortBy === 'category') return a.category.localeCompare(b.category);
       return b.updatedAt - a.updatedAt;
     });
@@ -521,7 +531,8 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     return {
       success: false,
-      error: error || 'Invalid Master Password. Decryption authentication tag mismatch.',
+      error:
+        'Incorrect password. If you recently restored a backup or QR kit with a separate backup password, enter that backup password (or your Emergency Recovery Key).',
     };
   };
 
@@ -720,18 +731,70 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   ): Promise<number> => {
     if (!cryptoKey) throw new Error('Vault is locked');
     const resolved = await importedInput;
+
+    const existingFingerprints = new Set(
+      records
+        .filter((r) => !r.deletedAt)
+        .map(
+          (r) =>
+            `${(r.title || '').toLowerCase().trim()}|${(r.username || '').toLowerCase().trim()}|${(
+              r.website ||
+              r.url ||
+              ''
+            )
+              .toLowerCase()
+              .trim()}|${r.password || ''}`
+        )
+    );
+
+    let savedCount = 0;
     for (const item of resolved) {
+      const fp = `${(item.title || '').toLowerCase().trim()}|${(
+        item.username || ''
+      )
+        .toLowerCase()
+        .trim()}|${(item.website || item.url || '').toLowerCase().trim()}|${item.password || ''}`;
+
+      if (existingFingerprints.has(fp)) {
+        continue;
+      }
+      existingFingerprints.add(fp);
+
       await vaultRepository.saveRecord(
         {
           ...item,
           type: item.type || 'login',
+          website: item.website || item.url,
+          url: item.url || item.website,
         },
         cryptoKey
       );
+      savedCount++;
     }
     await refreshRecords();
-    return resolved.length;
+    return savedCount;
   };
+
+  const applyRestoredVault = useCallback((restored: RestoreBackupResult) => {
+    vaultRepository.setActiveKey(restored.cryptoKey);
+    setMetadata(restored.metadata);
+    setCryptoKey(restored.cryptoKey);
+    setRecords(restored.records);
+    recordsRef.current = restored.records;
+    selectedRecordRef.current = null;
+    setSelectedRecord(null);
+    setEditingRecord(null);
+    setIntegrityWarning(null);
+    setFailedAttempts(0);
+    setError(null);
+    activeViewRef.current = 'items';
+    selectedCategoryRef.current = 'all';
+    navStackRef.current = [];
+    setActiveView('items');
+    setSelectedCategory('all');
+    setStatus('unlocked');
+    lastActivityRef.current = Date.now();
+  }, []);
 
   const updateSettings = async (newSettings: Partial<AppSettings>) => {
     const merged = { ...settings, ...newSettings };
@@ -912,6 +975,7 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         toggleFavorite,
         duplicateRecord,
         importMultipleRecords,
+        applyRestoredVault,
         updateSettings,
         copySecretToClipboard,
         copyToClipboard,

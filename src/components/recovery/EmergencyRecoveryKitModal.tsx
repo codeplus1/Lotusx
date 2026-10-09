@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   QrCode,
   Printer,
@@ -13,10 +13,12 @@ import {
   AlertTriangle,
   RefreshCw,
   CheckCircle2,
+  FileKey,
 } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { Modal } from '../common/Modal';
 import { emergencyKitService, EmergencyKitData } from '../../services/RecoveryKitService';
+import { backupService } from '../../storage/BackupService';
 
 interface EmergencyRecoveryKitModalProps {
   isOpen: boolean;
@@ -52,6 +54,21 @@ export const EmergencyRecoveryKitModal: React.FC<EmergencyRecoveryKitModalProps>
       setIsGenerating(false);
     }
   };
+
+  useEffect(() => {
+    if (kitData && kitData.fitsInQr && !kitData.qrDataUrl) {
+      const timer = setTimeout(() => {
+        const canvas = document.querySelector(
+          '#lotusx-emergency-qr-container canvas'
+        ) as HTMLCanvasElement | null;
+        if (canvas) {
+          const url = canvas.toDataURL('image/png');
+          setKitData((prev) => (prev ? { ...prev, qrDataUrl: url } : null));
+        }
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [kitData]);
 
   const handleClose = () => {
     setKitData(null);
@@ -162,13 +179,21 @@ export const EmergencyRecoveryKitModal: React.FC<EmergencyRecoveryKitModalProps>
                 <div className="space-y-2.5 text-xs text-text-secondary">
                   <h4 className="font-bold text-sm text-text-primary flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-primary" />
-                    Zero-Knowledge Optical Backup
+                    {kitData.isDisasterKeyOnly
+                      ? 'Cryptographic Key QR (Large Vault Mode)'
+                      : 'Zero-Knowledge Full Optical Backup'}
                   </h4>
-                  <p className="leading-relaxed">
-                    Scan this QR code from the LotusX Welcome or Unlock screen using your phone&apos;s camera to restore all {kitData.recordCount} credentials offline.
-                  </p>
+                  {kitData.isDisasterKeyOnly ? (
+                    <p className="leading-relaxed">
+                      Your vault has {kitData.recordCount} credentials ({kitData.payloadSizeBytes} bytes), which exceeds the capacity of a single optical QR code. This QR stores your encrypted cryptographic keys; pair it with the downloaded <code className="font-mono">.vault</code> file to restore all credentials.
+                    </p>
+                  ) : (
+                    <p className="leading-relaxed">
+                      Scan this QR code from the LotusX Welcome, Unlock, or Settings screen using your camera or saved QR PNG to restore all {kitData.recordCount} credentials offline.
+                    </p>
+                  )}
                   <div className="p-2.5 rounded-lg bg-warning/15 border border-warning/30 text-text-primary text-[11px]">
-                    <strong className="text-warning">Tip:</strong> Write down your Master Password on the printed sheet and store it in a physical safe or locked drawer.
+                    <strong className="text-warning">Tip:</strong> Write down your encryption password on the printed sheet and store it in a physical safe or locked drawer.
                   </div>
                 </div>
               </div>
@@ -187,7 +212,15 @@ export const EmergencyRecoveryKitModal: React.FC<EmergencyRecoveryKitModalProps>
                 ← Generate Again
               </button>
 
-              <div className="flex items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => backupService.exportEncryptedBackup(password)}
+                  className="px-3.5 py-2 rounded-lg border border-border hover:bg-bg-secondary text-xs font-semibold text-text-primary flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <FileKey className="w-3.5 h-3.5 text-primary" />
+                  Download .vault
+                </button>
                 {kitData.fitsInQr && (
                   <button
                     type="button"

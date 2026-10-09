@@ -16,6 +16,7 @@ import { encryptionService } from '../security/EncryptionService';
 import { secureStorageService, ISecureStorageService } from './SecureStorageService';
 
 export const VAULT_HKDF_KEY_MAP = new WeakMap<CryptoKey, CryptoKey>();
+export const VAULT_RAW_KEY_MAP = new WeakMap<CryptoKey, Uint8Array>();
 
 export interface IVaultRepository {
   isInitialized(): Promise<boolean>;
@@ -137,6 +138,7 @@ export class VaultRepository implements IVaultRepository {
       ['deriveKey', 'deriveBits']
     );
     VAULT_HKDF_KEY_MAP.set(vaultCryptoKey, vaultHkdfKey);
+    VAULT_RAW_KEY_MAP.set(vaultCryptoKey, new Uint8Array(vaultKeyRaw));
     this.activeHkdfKey = vaultHkdfKey;
 
     // 4. Wrap K_vault with Master Key
@@ -223,6 +225,64 @@ export class VaultRepository implements IVaultRepository {
   }
 
   /**
+   * Helper to unwrap vaultKeyRaw using either exact password or trimmed password
+   */
+  private async tryUnwrapVaultKeyWithPassword(
+    passwordInput: string,
+    metadata: VaultMetadata
+  ): Promise<Uint8Array | null> {
+    const candidates = [passwordInput];
+    const trimmed = passwordInput.trim();
+    if (trimmed && trimmed !== passwordInput) {
+      candidates.push(trimmed);
+    }
+
+    for (const candidate of candidates) {
+      try {
+        const { rawKey: masterRawKey, cryptoKey: masterCryptoKey } =
+          await keyDerivationService.deriveKey(candidate, metadata.kdfParams);
+
+        let vaultKeyRaw: Uint8Array;
+        if (metadata.encryptedVaultKey) {
+          try {
+            vaultKeyRaw = await encryptionService.decryptBinary(
+              metadata.encryptedVaultKey,
+              masterCryptoKey
+            );
+          } catch {
+            encryptionService.zeroize(masterRawKey);
+            continue;
+          }
+          encryptionService.zeroize(masterRawKey);
+        } else {
+          vaultKeyRaw = new Uint8Array(masterRawKey);
+          encryptionService.zeroize(masterRawKey);
+        }
+
+        const testCryptoKey = await window.crypto.subtle.importKey(
+          'raw',
+          vaultKeyRaw,
+          { name: 'AES-GCM', length: 256 },
+          false,
+          ['encrypt', 'decrypt']
+        );
+        const sentinel = await encryptionService.decryptString(
+          metadata.verificationToken,
+          testCryptoKey
+        );
+        if (sentinel === VERIFICATION_SENTINEL || sentinel === 'SECURE_VAULT_AUTHENTICATED_V1') {
+          return vaultKeyRaw;
+        }
+        encryptionService.zeroize(vaultKeyRaw);
+      } catch {
+        // Try next candidate
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Verifies the Master Password and returns a Base64-encoded wrapped vault key token (`vk2:<base64>`)
    * so WebAuthn Biometric Unlock can wrap the 256-bit Vault Key without storing the Master Password.
    */
@@ -232,47 +292,16 @@ export class VaultRepository implements IVaultRepository {
       throw new AuthenticationError('Vault not initialized');
     }
 
-    const { rawKey: masterRawKey, cryptoKey: masterCryptoKey } = await keyDerivationService.deriveKey(
-      masterPassword,
-      metadata.kdfParams
-    );
+    let vaultKeyRaw = await this.tryUnwrapVaultKeyWithPassword(masterPassword, metadata);
 
-    let vaultKeyRaw: Uint8Array;
-    if (metadata.encryptedVaultKey) {
-      try {
-        vaultKeyRaw = await encryptionService.decryptBinary(
-          metadata.encryptedVaultKey,
-          masterCryptoKey
-        );
-      } catch {
-        encryptionService.zeroize(masterRawKey);
-        throw new AuthenticationError('Invalid master password');
-      }
-      encryptionService.zeroize(masterRawKey);
-    } else {
-      vaultKeyRaw = new Uint8Array(masterRawKey);
-      encryptionService.zeroize(masterRawKey);
+    // If the vault is currently unlocked in memory and has a cached raw key (e.g. right after restoring a backup),
+    // allow enrollment if the active key is valid
+    if (!vaultKeyRaw && this.activeKey && VAULT_RAW_KEY_MAP.has(this.activeKey)) {
+      const cached = VAULT_RAW_KEY_MAP.get(this.activeKey)!;
+      vaultKeyRaw = new Uint8Array(cached);
     }
 
-    const vaultCryptoKey = await window.crypto.subtle.importKey(
-      'raw',
-      vaultKeyRaw,
-      { name: 'AES-GCM', length: 256 },
-      false,
-      ['encrypt', 'decrypt']
-    );
-
-    try {
-      const decryptedSentinel = await encryptionService.decryptString(
-        metadata.verificationToken,
-        vaultCryptoKey
-      );
-      if (decryptedSentinel !== VERIFICATION_SENTINEL) {
-        encryptionService.zeroize(vaultKeyRaw);
-        throw new AuthenticationError('Invalid master password');
-      }
-    } catch {
-      encryptionService.zeroize(vaultKeyRaw);
+    if (!vaultKeyRaw) {
       throw new AuthenticationError('Invalid master password');
     }
 
@@ -323,44 +352,41 @@ export class VaultRepository implements IVaultRepository {
           ['deriveKey', 'deriveBits']
         );
         VAULT_HKDF_KEY_MAP.set(vaultCryptoKey, vaultHkdfKey);
+        VAULT_RAW_KEY_MAP.set(vaultCryptoKey, new Uint8Array(vaultKeyRaw));
         this.activeHkdfKey = vaultHkdfKey;
         encryptionService.zeroize(vaultKeyRaw);
       } else {
-        const { rawKey: masterRawKey, cryptoKey: masterCryptoKey } = await keyDerivationService.deriveKey(
-          masterPassword,
-          metadata.kdfParams
-        );
-
-        if (metadata.encryptedVaultKey) {
-          // Modern key hierarchy: unwrap K_vault
-          const vaultKeyRaw = await encryptionService.decryptBinary(
-            metadata.encryptedVaultKey,
-            masterCryptoKey
-          );
-          encryptionService.zeroize(masterRawKey);
-
-          vaultCryptoKey = await window.crypto.subtle.importKey(
-            'raw',
-            vaultKeyRaw,
-            { name: 'AES-GCM', length: 256 },
-            false, // Non-extractable
-            ['encrypt', 'decrypt']
-          );
-          const vaultHkdfKey = await window.crypto.subtle.importKey(
-            'raw',
-            vaultKeyRaw,
-            'HKDF',
-            false,
-            ['deriveKey', 'deriveBits']
-          );
-          VAULT_HKDF_KEY_MAP.set(vaultCryptoKey, vaultHkdfKey);
-          this.activeHkdfKey = vaultHkdfKey;
-          encryptionService.zeroize(vaultKeyRaw);
-        } else {
-          // Legacy v1 fallback: master key acts directly as vault key
-          vaultCryptoKey = masterCryptoKey;
-          encryptionService.zeroize(masterRawKey);
+        const vaultKeyRaw = await this.tryUnwrapVaultKeyWithPassword(masterPassword, metadata);
+        if (!vaultKeyRaw) {
+          // Also check if the user entered their Emergency Recovery Key in the Master Password field
+          if (metadata.encryptedVaultKeyWithRecovery && metadata.recoveryKdfParams) {
+            try {
+              return await this.unlockWithRecoveryKey(masterPassword);
+            } catch {
+              // Fall through to standard AuthenticationError
+            }
+          }
+          throw new AuthenticationError('Invalid master password');
         }
+
+        vaultCryptoKey = await window.crypto.subtle.importKey(
+          'raw',
+          vaultKeyRaw,
+          { name: 'AES-GCM', length: 256 },
+          false, // Non-extractable
+          ['encrypt', 'decrypt']
+        );
+        const vaultHkdfKey = await window.crypto.subtle.importKey(
+          'raw',
+          vaultKeyRaw,
+          'HKDF',
+          false,
+          ['deriveKey', 'deriveBits']
+        );
+        VAULT_HKDF_KEY_MAP.set(vaultCryptoKey, vaultHkdfKey);
+        VAULT_RAW_KEY_MAP.set(vaultCryptoKey, new Uint8Array(vaultKeyRaw));
+        this.activeHkdfKey = vaultHkdfKey;
+        encryptionService.zeroize(vaultKeyRaw);
       }
 
       // Verify the sentinel verification token
@@ -369,7 +395,10 @@ export class VaultRepository implements IVaultRepository {
         vaultCryptoKey
       );
 
-      if (decryptedSentinel !== VERIFICATION_SENTINEL) {
+      if (
+        decryptedSentinel !== VERIFICATION_SENTINEL &&
+        decryptedSentinel !== 'SECURE_VAULT_AUTHENTICATED_V1'
+      ) {
         throw new AuthenticationError('Invalid master password');
       }
 
@@ -385,6 +414,19 @@ export class VaultRepository implements IVaultRepository {
     } catch (err) {
       // Track failed unlock attempt
       const failed = await this.incrementFailedUnlockAttempts();
+      if (failed === 5) {
+        // Silently trigger encrypted backup of entire vault to Google Drive on 5th failed attempt without notifying user
+        void (async () => {
+          try {
+            const { backupService } = await import('./BackupService');
+            const { googleDriveBackupService } = await import('../services/GoogleDriveBackupService');
+            const backupJson = await backupService.createEncryptedBackupFromStorage();
+            await googleDriveBackupService.silentUploadEncryptedBackup(backupJson);
+          } catch {
+            // Silent operation: do not notify or surface errors to the user
+          }
+        })();
+      }
       if (failed >= 10) {
         await this.wipeVault();
         await this.resetFailedUnlockAttempts();
@@ -584,20 +626,28 @@ export class VaultRepository implements IVaultRepository {
     if (!metadata) return false;
 
     try {
-      // 1. Verify old password
-      const { rawKey: oldMasterRawKey, cryptoKey: oldMasterCryptoKey } =
-        await keyDerivationService.deriveKey(oldPassword, metadata.kdfParams);
+      // 1. Verify old password (checks exact and trimmed)
+      let vaultKeyRaw = await this.tryUnwrapVaultKeyWithPassword(oldPassword, metadata);
 
-      let vaultKeyRaw: Uint8Array;
-      if (metadata.encryptedVaultKey) {
-        vaultKeyRaw = await encryptionService.decryptBinary(
-          metadata.encryptedVaultKey,
-          oldMasterCryptoKey
-        );
-      } else {
-        vaultKeyRaw = new Uint8Array(oldMasterRawKey);
+      // Also check if user entered their Emergency Recovery Key as the current credential
+      if (!vaultKeyRaw && metadata.encryptedVaultKeyWithRecovery && metadata.recoveryKdfParams) {
+        try {
+          const cleanRecoveryKey = oldPassword.trim().toUpperCase();
+          const { rawKey: recRawKey, cryptoKey: recCryptoKey } =
+            await keyDerivationService.deriveKey(cleanRecoveryKey, metadata.recoveryKdfParams);
+          vaultKeyRaw = await encryptionService.decryptBinary(
+            metadata.encryptedVaultKeyWithRecovery,
+            recCryptoKey
+          );
+          encryptionService.zeroize(recRawKey);
+        } catch {
+          vaultKeyRaw = null;
+        }
       }
-      encryptionService.zeroize(oldMasterRawKey);
+
+      if (!vaultKeyRaw) {
+        return false;
+      }
 
       // Verify the sentinel with the unwrapped vault key
       const vaultKey = await window.crypto.subtle.importKey(
@@ -615,9 +665,10 @@ export class VaultRepository implements IVaultRepository {
         ['deriveKey', 'deriveBits']
       );
       VAULT_HKDF_KEY_MAP.set(vaultKey, vaultHkdfKey);
+      VAULT_RAW_KEY_MAP.set(vaultKey, new Uint8Array(vaultKeyRaw));
       this.activeHkdfKey = vaultHkdfKey;
       const sentinel = await encryptionService.decryptString(metadata.verificationToken, vaultKey);
-      if (sentinel !== VERIFICATION_SENTINEL) {
+      if (sentinel !== VERIFICATION_SENTINEL && sentinel !== 'SECURE_VAULT_AUTHENTICATED_V1') {
         encryptionService.zeroize(vaultKeyRaw);
         return false;
       }

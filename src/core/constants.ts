@@ -30,6 +30,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   passwordMaskTimeoutSeconds: 30,
   argon2SecurityLevel: 'high',
   kdfIterations: 3,
+  generatorDefaults: {
+    length: 20,
+    uppercase: true,
+    lowercase: true,
+    numbers: true,
+    symbols: true,
+  },
   storageEngine: 'indexeddb',
   storageQuotaMb: 0, // 0 = Unlimited / Auto-Expand (No 5MB limit!)
   persistentStorageRequested: false,

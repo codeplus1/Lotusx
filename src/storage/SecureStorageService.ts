@@ -28,6 +28,15 @@ export interface ISecureStorageService {
 
 const STORAGE_QUOTA_PREF_KEY = 'lotusx_configured_storage_quota_mb_v1';
 const BIOMETRIC_STORAGE_KEY = 'lotusx_webauthn_biometric_v1';
+const PRESERVED_LOCAL_STORAGE_KEYS = new Set([
+  STORAGE_QUOTA_PREF_KEY,
+  BIOMETRIC_STORAGE_KEY,
+  'lotusx_last_gdrive_backup_at',
+  'lotusx_last_gdrive_backup_at_name',
+  'lotusx_last_backup_at',
+  'lotusx_gdrive_reminder_dismissed_at',
+  'lotusx_gdrive_client_id',
+]);
 
 /**
  * Enterprise Secure Storage Service
@@ -104,8 +113,7 @@ export class UnifiedSecureStorageService implements ISecureStorageService {
             key.startsWith('lotusx_') ||
             Object.values(STORAGE_KEYS).includes(key))
         ) {
-          // Do not delete quota preference or WebAuthn biometric metadata key from localStorage during migration
-          if (key !== STORAGE_QUOTA_PREF_KEY && key !== BIOMETRIC_STORAGE_KEY) {
+          if (!PRESERVED_LOCAL_STORAGE_KEYS.has(key)) {
             keysToMigrate.push(key);
           }
         }
@@ -235,7 +243,7 @@ export class UnifiedSecureStorageService implements ISecureStorageService {
             key.startsWith('lotusx_') ||
             Object.values(STORAGE_KEYS).includes(key))
         ) {
-          if (key !== STORAGE_QUOTA_PREF_KEY && key !== BIOMETRIC_STORAGE_KEY) {
+          if (!PRESERVED_LOCAL_STORAGE_KEYS.has(key)) {
             keysToRemove.push(key);
           }
         }
@@ -269,7 +277,7 @@ export class UnifiedSecureStorageService implements ISecureStorageService {
             key.startsWith('lotusx_') ||
             Object.values(STORAGE_KEYS).includes(key))
         ) {
-          if (key !== STORAGE_QUOTA_PREF_KEY && key !== BIOMETRIC_STORAGE_KEY) {
+          if (!PRESERVED_LOCAL_STORAGE_KEYS.has(key)) {
             keysToMigrate.push(key);
           }
         }

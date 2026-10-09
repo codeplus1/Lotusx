@@ -3,12 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { KeyRound, Clock, Trash2, Menu, X, Smartphone, Sun, Moon, ArrowLeft } from 'lucide-react';
+import React from 'react';
+import { KeyRound, Clock, Trash2, Menu, X, Sun, Moon, ArrowLeft, Star, LogOut } from 'lucide-react';
 import { useVault } from '../../context/VaultContext';
 import { useTheme } from '../../context/ThemeContext';
-import { usePWAInstall } from '../../hooks/usePWAInstall';
-import { MobileInstallModal } from '../mobile/MobileInstallModal';
 import { VAULT_CATEGORIES } from '../../core/constants';
 
 export const Header: React.FC = () => {
@@ -16,7 +14,10 @@ export const Header: React.FC = () => {
     status,
     activeView,
     selectedCategory,
+    setSelectedCategory,
+    setSearchQuery,
     selectedRecord,
+    setSelectedRecord,
     clipboardSeconds,
     clearClipboardNow,
     setIsGeneratorModalOpen,
@@ -25,23 +26,31 @@ export const Header: React.FC = () => {
     canGoBack,
     navigateBack,
     setActiveView,
+    lockVault,
   } = useVault();
 
   const { isDark, toggleDarkMode } = useTheme();
-  const { triggerInstall, isInstalled } = usePWAInstall();
-  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
-  const [isInstalling, setIsInstalling] = useState(false);
 
-  const handleInstallClick = async () => {
-    setIsInstalling(true);
+  const handleExitApp = () => {
+    lockVault();
     try {
-      const outcome = await triggerInstall();
-      if (outcome === 'unsupported') {
-        setIsInstallModalOpen(true);
-      }
-    } finally {
-      setIsInstalling(false);
+      window.close();
+    } catch {
+      // Ignore if browser blocks window.close()
     }
+  };
+
+  const isFavoritesActive =
+    status === 'unlocked' &&
+    activeView === 'items' &&
+    selectedCategory === 'favorites' &&
+    !selectedRecord;
+
+  const handleFavoritesClick = () => {
+    setSelectedRecord(null);
+    setSearchQuery('');
+    setSelectedCategory('favorites');
+    setActiveView('items');
   };
 
   const getHeaderPageTitle = (): string | null => {
@@ -56,6 +65,9 @@ export const Header: React.FC = () => {
         }
         if (selectedCategory === 'trash') {
           return 'Trash';
+        }
+        if (selectedCategory === 'favorites') {
+          return 'Favorites';
         }
         const catDef = VAULT_CATEGORIES.find((c) => c.id === selectedCategory);
         if (catDef) {
@@ -156,6 +168,28 @@ export const Header: React.FC = () => {
             </div>
           )}
 
+          {/* Favorites Icon Button */}
+          {status === 'unlocked' && (
+            <button
+              id="header-favorites-btn"
+              type="button"
+              onClick={handleFavoritesClick}
+              className={`p-2 rounded-full transition-colors h-10 w-10 flex items-center justify-center shrink-0 cursor-pointer ${
+                isFavoritesActive
+                  ? 'bg-[#062A63] text-[#08BBD4] border border-[#08BBD4]/40'
+                  : 'text-[#B8C6D8] hover:text-[#08BBD4] hover:bg-[#062A63]/70 active:bg-[#062A63]'
+              }`}
+              title="Favorites"
+              aria-label="Favorites"
+            >
+              <Star
+                className={`w-5 h-5 ${
+                  isFavoritesActive ? 'text-[#08BBD4] fill-[#08BBD4]' : 'text-[#B8C6D8]'
+                }`}
+              />
+            </button>
+          )}
+
           {/* Light / Dark Mode Toggle */}
           <button
             id="theme-mode-toggle-btn"
@@ -168,21 +202,6 @@ export const Header: React.FC = () => {
             {isDark ? <Sun className="w-5 h-5 text-[#08BBD4]" /> : <Moon className="w-5 h-5 text-[#B8C6D8]" />}
           </button>
 
-          {/* Install Mobile App Button (auto-suppressed when already running in standalone mode) */}
-          {!isInstalled && (
-            <button
-              id="header-install-btn"
-              onClick={handleInstallClick}
-              disabled={isInstalling}
-              className="flex items-center justify-center gap-1.5 p-2 sm:px-3.5 sm:py-2 rounded-full hover:bg-[#062A63]/80 sm:bg-[#062A63]/70 sm:border sm:border-[#1D3855] sm:hover:border-[#08BBD4]/60 text-white text-xs font-medium transition-colors h-10 w-10 sm:w-auto whitespace-nowrap shrink-0 cursor-pointer"
-              title="Directly install LotusX on your device"
-              aria-label="Install mobile app"
-            >
-              <Smartphone className="w-5 h-5 sm:w-4 sm:h-4 text-[#08BBD4] shrink-0" />
-              <span className="hidden sm:inline">{isInstalling ? 'Opening...' : 'Install App'}</span>
-            </button>
-          )}
-
           {/* Quick Generator Button (Desktop) */}
           {status === 'unlocked' && (
             <button
@@ -194,14 +213,22 @@ export const Header: React.FC = () => {
               <span>Generator</span>
             </button>
           )}
+
+          {/* Exit App Button */}
+          {status === 'unlocked' && (
+            <button
+              id="header-exit-app-btn"
+              type="button"
+              onClick={handleExitApp}
+              className="p-2 rounded-full text-[#B8C6D8] hover:text-[#D64545] hover:bg-[#D64545]/15 active:bg-[#D64545]/25 transition-colors h-10 w-10 flex items-center justify-center shrink-0 cursor-pointer"
+              title="Exit App"
+              aria-label="Exit App"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
-
-      {/* Mobile App (.apk / PWA) Install Dialog */}
-      <MobileInstallModal
-        isOpen={isInstallModalOpen}
-        onClose={() => setIsInstallModalOpen(false)}
-      />
     </header>
   );
 };

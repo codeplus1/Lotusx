@@ -25,7 +25,13 @@ export type RecordCategory =
 
 export type RecordType = 'login' | 'card' | 'identity' | 'note' | 'wifi' | 'pin';
 
-export type SortOption = 'updated_desc' | 'title_asc' | 'title_desc' | 'category';
+export type SortOption =
+  | 'updated_desc'
+  | 'created_desc'
+  | 'title_asc'
+  | 'title_desc'
+  | 'category'
+  | 'strength_asc';
 
 export const CATEGORY_METADATA: Record<
   string,
@@ -35,9 +41,9 @@ export const CATEGORY_METADATA: Record<
   favorites: { label: 'Starred Favorites', description: 'Frequently accessed credentials' },
   trash: { label: 'Trash', description: 'Soft-deleted records' },
   passwords: { label: 'Logins & Passwords', description: 'Website and app credentials' },
-  banking: { label: 'Banking & Finance', description: 'Bank accounts, routing, and IFSC details' },
-  cards: { label: 'Credit & Debit Cards', description: 'Payment cards, CVV, and PINs' },
-  card: { label: 'Credit & Debit Cards', description: 'Payment cards, CVV, and PINs' },
+  banking: { label: 'Banking & Finance', description: 'Bank accounts, routing, and online banking' },
+  cards: { label: 'Credit & Debit Cards', description: 'Payment cards, expiry, and billing details' },
+  card: { label: 'Credit & Debit Cards', description: 'Payment cards, expiry, and billing details' },
   social: { label: 'Social Media', description: 'Social network accounts and profiles' },
   email: { label: 'Email Accounts', description: 'Personal and work email credentials' },
   work: { label: 'Work & Developer', description: 'Corporate SSO, cloud, and API tokens' },
@@ -57,31 +63,71 @@ export interface CustomField {
   isHidden?: boolean;
 }
 
+export type BankAccountType = 'Savings' | 'Current/Checking' | 'Fixed Deposit' | 'Other';
+
+export interface BankDetails {
+  bankName?: string;
+  accountHolderName?: string;
+  accountType?: BankAccountType;
+  accountNumber?: string;
+  branchName?: string;
+  branchCode?: string;
+  swiftBic?: string;
+  iban?: string;
+  routingOrIfsc?: string;
+  onlineBankingUsername?: string;
+  onlineBankingPassword?: string;
+  bankWebsiteUrl?: string;
+}
+
+export type PaymentCardKind = 'Debit' | 'Credit' | 'Prepaid';
+export type PaymentCardNetwork = 'Visa' | 'Mastercard' | 'American Express' | 'Other';
+
 export interface CardDetails {
   cardholderName?: string;
+  cardKind?: PaymentCardKind;
+  cardNetwork?: PaymentCardNetwork;
   cardNumber?: string;
   expirationMonth?: string;
   expirationYear?: string;
   cvv?: string;
   pin?: string;
+  issuingBank?: string;
+  billingAddress?: string;
   cardType?: 'visa' | 'mastercard' | 'amex' | 'discover' | 'other';
 }
 
+export type IdentityDocumentType =
+  | 'Passport'
+  | 'National ID'
+  | "Driver's License"
+  | 'Social Security / Tax ID'
+  | 'Voter ID'
+  | 'Residence Permit'
+  | 'Other';
+
 export interface IdentityDetails {
   fullName?: string;
+  dateOfBirth?: string;
+  documentType?: IdentityDocumentType | string;
+  documentNumber?: string;
+  issuingCountry?: string;
+  issueDate?: string;
+  expiryDate?: string;
   email?: string;
   phone?: string;
   address?: string;
   idNumber?: string;
   passportNumber?: string;
   ssn?: string;
-  dateOfBirth?: string;
 }
+
+export type WifiSecurityType = 'WPA3' | 'WPA2' | 'WPA/WPA2' | 'WEP' | 'Open';
 
 export interface WifiDetails {
   ssid?: string;
   password?: string;
-  securityType?: 'WPA3' | 'WPA2' | 'WEP' | 'Open';
+  securityType?: WifiSecurityType;
   hiddenNetwork?: boolean;
 }
 
@@ -110,19 +156,32 @@ export interface VaultRecord {
   updatedAt: number;
   deletedAt?: number;
   lastUsedAt?: number;
+  strengthScore?: number;
   tags: string[];
   customFields?: CustomField[];
+  bankDetails?: BankDetails;
   cardDetails?: CardDetails;
   identityDetails?: IdentityDetails;
   wifiDetails?: WifiDetails;
   pin?: string;
   bankName?: string;
+  accountHolderName?: string;
+  accountType?: BankAccountType;
   accountNumber?: string;
+  branchName?: string;
+  branchCode?: string;
+  swiftBic?: string;
+  iban?: string;
   routingOrIfsc?: string;
+  cardholderName?: string;
+  cardKind?: PaymentCardKind;
+  cardNetwork?: PaymentCardNetwork;
   cardNumber?: string;
   cardExpiry?: string;
   cardCvv?: string;
   cardPin?: string;
+  issuingBank?: string;
+  billingAddress?: string;
   totpSecret?: string;
   passwordHistory?: PasswordHistoryItem[];
 }
@@ -253,6 +312,14 @@ export interface SecurityScoreReport {
 
 export type SecurityHealthReport = SecurityScoreReport;
 
+export interface GeneratorPreferences {
+  length: number;
+  uppercase: boolean;
+  lowercase: boolean;
+  numbers: boolean;
+  symbols: boolean;
+}
+
 /**
  * Application Settings
  */
@@ -264,6 +331,7 @@ export interface AppSettings {
   passwordMaskTimeoutSeconds: number;
   argon2SecurityLevel: 'standard' | 'high'; // 32MB vs 64MB
   kdfIterations: number;
+  generatorDefaults?: GeneratorPreferences;
   // User-configurable storage settings (solves 5MB limit permanently):
   storageEngine?: StorageEngineType; // strictly 'indexeddb' (unlimited/GBs)
   storageQuotaMb?: number; // 0 = Unlimited (Browser Max / Multi-GB), or custom MB ceiling

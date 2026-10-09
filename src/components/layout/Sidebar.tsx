@@ -8,7 +8,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   LayoutDashboard,
   Key,
-  Star,
   ShieldAlert,
   KeyRound,
   Settings,
@@ -19,7 +18,6 @@ import {
   Wifi,
   Mail,
   Briefcase,
-  CheckCircle2,
   X,
   Shield,
   ChevronDown,
@@ -48,8 +46,8 @@ export const Sidebar: React.FC = () => {
     onBack: () => setIsMobileMenuOpen(false),
   });
 
-  const totalItems = records.length;
-  const totalFavorites = records.filter((r) => r.favorite).length;
+  const activeRecords = records.filter((r) => !r.deletedAt);
+  const totalItems = activeRecords.length;
 
   const navigateToCategory = (cat: RecordCategory) => {
     setSelectedCategory(cat);
@@ -69,16 +67,14 @@ export const Sidebar: React.FC = () => {
   const primaryNavItems = [
     { id: 'dashboard' as AppView, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'items' as AppView, label: 'All Items', icon: Key, count: totalItems, category: 'all' as RecordCategory },
-    { id: 'items' as AppView, label: 'Favorites', icon: Star, count: totalFavorites, category: 'favorites' as RecordCategory },
     { id: 'security_center' as AppView, label: 'Security Center', icon: ShieldAlert },
   ];
 
   const advancedNavItems = [
     { id: 'generator' as AppView, label: 'Generator', fullTitle: 'Password Generator', icon: KeyRound },
-    { id: 'audit' as AppView, label: 'Audit Suite', fullTitle: 'Crypto Test Suite', icon: CheckCircle2 },
   ];
 
-  const isAdvancedActive = activeView === 'generator' || activeView === 'audit';
+  const isAdvancedActive = activeView === 'generator';
   const [isAdvancedExpanded, setIsAdvancedExpanded] = React.useState<boolean>(() => isAdvancedActive);
 
   React.useEffect(() => {
@@ -254,7 +250,11 @@ export const Sidebar: React.FC = () => {
         <div className="mt-2 space-y-1">
           {categoryShortcuts.map((cat) => {
             const Icon = cat.icon;
-            const count = records.filter((r) => r.category === cat.id).length;
+            const count = activeRecords.filter((r) => {
+              if (cat.id === 'cards') return r.category === 'cards' || r.category === 'card';
+              if (cat.id === 'notes') return r.category === 'notes' || r.category === 'note';
+              return r.category === cat.id;
+            }).length;
             const isSelected = activeView === 'items' && selectedCategory === cat.id;
 
             return (
@@ -289,22 +289,11 @@ export const Sidebar: React.FC = () => {
     </div>
   );
 
-  const renderFooter = () => (
-    <div className="p-4 border-t border-[#1D3855] bg-[#03152F] text-xs shrink-0">
-      <div className="flex items-center gap-2">
-        <div className="w-2 h-2 rounded-full bg-[#16A56B] shrink-0" />
-        <span className="text-[11px] font-medium text-[#F5F9FF]">Local Encrypted Store</span>
-      </div>
-      <p className="text-[10px] text-[#8493A5] mt-1">Zero cloud leaks • Offline guaranteed</p>
-    </div>
-  );
-
   return (
     <>
       {/* Desktop Persistent Sidebar */}
       <aside className="hidden lg:flex w-64 bg-[#03152F] text-[#F5F9FF] flex-col shrink-0 min-h-[calc(100vh-4rem)] border-r border-[#1D3855]">
         {renderNavList()}
-        {renderFooter()}
       </aside>
 
       {/* Mobile Drawer (Visible on < lg when isMobileMenuOpen is true) */}
@@ -347,9 +336,6 @@ export const Sidebar: React.FC = () => {
 
             {/* Navigation Body */}
             {renderNavList()}
-
-            {/* Drawer Footer */}
-            {renderFooter()}
           </div>
         </div>
       )}

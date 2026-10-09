@@ -49,7 +49,7 @@ export const AuditRunnerView: React.FC = () => {
             Automated Security Self-Audit
           </h1>
           <p className="text-xs sm:text-sm text-[#B8C6D8] max-w-2xl leading-relaxed">
-            Executes real-time unit and integration verification tests against your browser&apos;s Web Crypto API, testing AES-256-GCM authentication tags, PBKDF2 key isolation, and tamper resistance.
+            Executes real-time unit and integration verification tests against your browser&apos;s Web Crypto API, testing AES-256-GCM authentication tags, Argon2id key derivation, and tamper resistance.
           </p>
         </div>
 

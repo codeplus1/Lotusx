@@ -29,20 +29,20 @@ export const PasswordGeneratorView: React.FC<PasswordGeneratorViewProps> = ({
   isModal = false,
   onSelectPassword,
 }) => {
-  const { copyToClipboard, copiedFieldLabel } = useVault();
+  const { copyToClipboard, copiedFieldLabel, settings } = useVault();
 
   const [mode, setMode] = useState<'password' | 'passphrase'>('password');
   const [generatedSecret, setGeneratedSecret] = useState('');
 
-  // Random character password options
-  const [pwOptions, setPwOptions] = useState<PasswordGeneratorOptions>({
-    length: 20,
-    uppercase: true,
-    lowercase: true,
-    numbers: true,
-    symbols: true,
+  // Random character password options initialized from saved Settings preferences
+  const [pwOptions, setPwOptions] = useState<PasswordGeneratorOptions>(() => ({
+    length: settings.generatorDefaults?.length ?? 20,
+    uppercase: settings.generatorDefaults?.uppercase ?? true,
+    lowercase: settings.generatorDefaults?.lowercase ?? true,
+    numbers: settings.generatorDefaults?.numbers ?? true,
+    symbols: settings.generatorDefaults?.symbols ?? true,
     excludeAmbiguous: false,
-  });
+  }));
 
   // Diceware passphrase options
   const [phraseOptions, setPhraseOptions] = useState<PassphraseOptions>({

@@ -4,7 +4,6 @@
  */
 
 import React, { useMemo } from 'react';
-import { motion } from 'motion/react';
 import {
   ShieldCheck,
   Landmark,
@@ -19,7 +18,6 @@ import {
   Folder,
   Key,
   Star,
-  Plus,
 } from 'lucide-react';
 import { useVault } from '../../context/VaultContext';
 import { RecordCategory } from '../../types/vault';
@@ -46,7 +44,6 @@ export const CategoriesView: React.FC = () => {
     records,
     setSelectedCategory,
     setActiveView,
-    setIsCreateModalOpen,
   } = useVault();
 
   const activeRecords = useMemo(() => records.filter((r) => !r.deletedAt), [records]);
@@ -73,26 +70,6 @@ export const CategoriesView: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-bg-surface p-6 rounded-xl border border-border shadow-xs">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary tracking-tight">
-            Vault Categories
-          </h1>
-          <p className="text-xs text-text-secondary mt-1">
-            Organize and filter your encrypted credentials by structured domain.
-          </p>
-        </div>
-
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="btn-primary inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs shadow-xs cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          Add New Credential
-        </button>
-      </div>
-
       {/* Category Cards Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {browseCategories.map((cat) => {

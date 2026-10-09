@@ -101,7 +101,7 @@ export const CreateVaultScreen: React.FC<CreateVaultScreenProps> = ({ onCancel, 
           <div>
             <h1 className="text-xl font-bold text-white">Initialize Master Vault</h1>
             <p className="text-xs text-[#B8C6D8]">
-              Create your primary encryption key (PBKDF2-HMAC-SHA256 • 600,000 iterations)
+              Create your primary encryption key (Argon2id + AES-256-GCM)
             </p>
           </div>
         </div>
@@ -263,7 +263,7 @@ export const CreateVaultScreen: React.FC<CreateVaultScreenProps> = ({ onCancel, 
             {isInitializing ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                Deriving 256-bit Key (600,000 PBKDF2 rounds)...
+                Deriving 256-bit Key (Argon2id)...
               </>
             ) : (
               <>
