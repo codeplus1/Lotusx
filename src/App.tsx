@@ -71,6 +71,7 @@ const VaultApp: React.FC = () => {
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [restorePassword, setRestorePassword] = useState('');
   const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [restoreSuccessMessage, setRestoreSuccessMessage] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
 
   // Disaster Recovery modals (Google Drive & QR Scanner)
@@ -133,13 +134,18 @@ const VaultApp: React.FC = () => {
 
     setIsRestoring(true);
     setRestoreError(null);
+    setRestoreSuccessMessage(null);
     try {
       const fileText = await restoreFile.text();
       const restored = await backupService.restoreEncryptedBackup(fileText, restorePassword);
-      alert(`Restored ${restored.recordCount} credentials! Please unlock your restored vault with your master password.`);
-      window.location.reload();
-    } catch (err: any) {
-      setRestoreError(err.message || 'Decryption failed. Check your password.');
+      setRestoreSuccessMessage(
+        `Restored ${restored.recordCount} credentials! Reloading vault...`
+      );
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (err: unknown) {
+      setRestoreError(
+        err instanceof Error ? err.message : 'Decryption failed. Check your password.'
+      );
     } finally {
       setIsRestoring(false);
     }
@@ -186,6 +192,10 @@ const VaultApp: React.FC = () => {
           <p className="text-xs text-error bg-error/10 border border-error/20 p-2.5 rounded-lg">{restoreError}</p>
         )}
 
+        {restoreSuccessMessage && (
+          <p className="text-xs text-success bg-success/10 border border-success/20 p-2.5 rounded-lg">{restoreSuccessMessage}</p>
+        )}
+
         <div className="flex justify-end gap-2 pt-2">
           <button
             type="button"
@@ -229,9 +239,8 @@ const VaultApp: React.FC = () => {
         <GoogleDriveBackupModal
           isOpen={isGoogleDriveModalOpen}
           onClose={() => setIsGoogleDriveModalOpen(false)}
-          onRestoreSuccess={(count) => {
+          onRestoreSuccess={() => {
             setIsGoogleDriveModalOpen(false);
-            alert(`Successfully restored ${count} credentials from Google Drive! Please unlock your vault with your Master Password.`);
             window.location.reload();
           }}
         />
@@ -239,9 +248,8 @@ const VaultApp: React.FC = () => {
         <QRScannerModal
           isOpen={isQRScannerModalOpen}
           onClose={() => setIsQRScannerModalOpen(false)}
-          onSuccess={(count) => {
+          onSuccess={() => {
             setIsQRScannerModalOpen(false);
-            alert(`Successfully restored ${count} credentials from your Recovery QR! Please unlock your vault with your Master Password.`);
             window.location.reload();
           }}
         />
@@ -264,9 +272,8 @@ const VaultApp: React.FC = () => {
         <GoogleDriveBackupModal
           isOpen={isGoogleDriveModalOpen}
           onClose={() => setIsGoogleDriveModalOpen(false)}
-          onRestoreSuccess={(count) => {
+          onRestoreSuccess={() => {
             setIsGoogleDriveModalOpen(false);
-            alert(`Successfully restored ${count} credentials from Google Drive! Please unlock your vault with your Master Password.`);
             window.location.reload();
           }}
         />
@@ -274,9 +281,8 @@ const VaultApp: React.FC = () => {
         <QRScannerModal
           isOpen={isQRScannerModalOpen}
           onClose={() => setIsQRScannerModalOpen(false)}
-          onSuccess={(count) => {
+          onSuccess={() => {
             setIsQRScannerModalOpen(false);
-            alert(`Successfully restored ${count} credentials from your Recovery QR! Please unlock your vault with your Master Password.`);
             window.location.reload();
           }}
         />

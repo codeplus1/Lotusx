@@ -28,6 +28,9 @@ export const UnlockVaultScreen: React.FC<UnlockVaultScreenProps> = ({
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [isBiometricUnlocking, setIsBiometricUnlocking] = useState(false);
   const [hasBiometrics, setHasBiometrics] = useState(false);
+  const [hardwareAvailable, setHardwareAvailable] = useState(false);
+  const [enableBiometricsAfterUnlock, setEnableBiometricsAfterUnlock] = useState(false);
+  const [platformBioLabel, setPlatformBioLabel] = useState('Fingerprint / Face ID');
   const [error, setError] = useState<string | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -35,6 +38,10 @@ export const UnlockVaultScreen: React.FC<UnlockVaultScreenProps> = ({
   useEffect(() => {
     const enabled = biometricService.isBiometricEnabled();
     setHasBiometrics(enabled);
+    setPlatformBioLabel(biometricService.getPlatformBiometricLabel());
+    biometricService.isHardwareAvailable().then((avail) => {
+      setHardwareAvailable(avail);
+    });
   }, []);
 
   useEffect(() => {
@@ -58,8 +65,10 @@ export const UnlockVaultScreen: React.FC<UnlockVaultScreenProps> = ({
       if (!result.success) {
         setError(result.error || 'Biometric unlock failed. Please enter your Master Password.');
       }
-    } catch (err: any) {
-      setError(err.message || 'Biometric authentication was cancelled or failed.');
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : 'Biometric authentication was cancelled or failed.'
+      );
     } finally {
       setIsBiometricUnlocking(false);
     }
@@ -73,6 +82,15 @@ export const UnlockVaultScreen: React.FC<UnlockVaultScreenProps> = ({
     setError(null);
 
     await new Promise((r) => setTimeout(r, 60));
+
+    if (enableBiometricsAfterUnlock && !hasBiometrics) {
+      try {
+        await biometricService.enableBiometricUnlock(password);
+        setHasBiometrics(true);
+      } catch {
+        // Proceed with standard password unlock even if user cancelled biometric prompt
+      }
+    }
 
     const result = await unlock(password);
     setIsUnlocking(false);
@@ -143,6 +161,22 @@ export const UnlockVaultScreen: React.FC<UnlockVaultScreenProps> = ({
             </div>
           </div>
 
+          {!hasBiometrics && hardwareAvailable && (
+            <label className="flex items-center gap-2.5 p-3 rounded-xl bg-[#061426]/80 border border-[#1D3855] cursor-pointer select-none hover:border-[#08BBD4]/50 transition-colors">
+              <input
+                type="checkbox"
+                checked={enableBiometricsAfterUnlock}
+                onChange={(e) => setEnableBiometricsAfterUnlock(e.target.checked)}
+                disabled={isUnlocking || cooldownSeconds > 0}
+                className="w-4 h-4 rounded border-[#1D3855] bg-[#03152F] text-[#08BBD4] focus:ring-[#08BBD4]"
+              />
+              <div className="flex items-center gap-2 text-xs text-[#F5F9FF]">
+                <Fingerprint className="w-4 h-4 text-[#08BBD4] shrink-0" />
+                <span>Enable {platformBioLabel} for future unlocks</span>
+              </div>
+            </label>
+          )}
+
           {error && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
@@ -199,7 +233,7 @@ export const UnlockVaultScreen: React.FC<UnlockVaultScreenProps> = ({
               ) : (
                 <>
                   <Fingerprint className="w-4 h-4 text-[#08BBD4]" />
-                  Unlock with Fingerprint / Face ID
+                  Unlock with {platformBioLabel}
                 </>
               )}
             </button>

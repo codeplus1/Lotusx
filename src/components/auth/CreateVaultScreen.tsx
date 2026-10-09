@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Lock, Eye, EyeOff, ArrowLeft, CheckCircle2, AlertTriangle, RefreshCw, ShieldCheck } from 'lucide-react';
+import { Lock, Eye, EyeOff, ArrowLeft, CheckCircle2, AlertTriangle, RefreshCw, ShieldCheck, Fingerprint } from 'lucide-react';
 import { passwordGenerator } from '../../security/PasswordGeneratorService';
+import { biometricService } from '../../security/BiometricService';
 import { useVault } from '../../context/VaultContext';
 import { LotusXLogo } from '../common/LotusXLogo';
 
@@ -22,8 +23,18 @@ export const CreateVaultScreen: React.FC<CreateVaultScreenProps> = ({ onCancel, 
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [understoodZeroKnowledge, setUnderstoodZeroKnowledge] = useState(false);
+  const [enableBiometrics, setEnableBiometrics] = useState(false);
+  const [biometricHardwareAvailable, setBiometricHardwareAvailable] = useState(false);
+  const [platformBioLabel, setPlatformBioLabel] = useState('Fingerprint / Face ID');
   const [isInitializing, setIsInitializing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPlatformBioLabel(biometricService.getPlatformBiometricLabel());
+    biometricService.isHardwareAvailable().then((avail) => {
+      setBiometricHardwareAvailable(avail);
+    });
+  }, []);
 
   const strength = passwordGenerator.evaluateStrength(masterPassword);
   const passwordsMatch = masterPassword.length > 0 && masterPassword === confirmPassword;
@@ -51,11 +62,18 @@ export const CreateVaultScreen: React.FC<CreateVaultScreenProps> = ({ onCancel, 
     try {
       await new Promise((r) => setTimeout(r, 80));
       await createNewVault(masterPassword, true);
+      if (enableBiometrics) {
+        try {
+          await biometricService.enableBiometricUnlock(masterPassword);
+        } catch {
+          // Non-fatal: vault is already created; user can enable biometrics later in Settings
+        }
+      }
       setMasterPassword('');
       setConfirmPassword('');
       onSuccess();
-    } catch (err: any) {
-      setError(err.message || 'Failed to initialize encrypted vault.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to initialize encrypted vault.');
       setIsInitializing(false);
     }
   };
@@ -205,6 +223,31 @@ export const CreateVaultScreen: React.FC<CreateVaultScreenProps> = ({ onCancel, 
               </span>
             </label>
           </div>
+
+          {biometricHardwareAvailable && (
+            <label className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-[#061426] border border-[#1D3855] hover:border-[#08BBD4]/50 transition-colors cursor-pointer select-none">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-[#062A63] border border-[#1D3855] flex items-center justify-center text-[#08BBD4] shrink-0">
+                  <Fingerprint className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs font-semibold text-white block">
+                    Enable Biometric Unlock ({platformBioLabel})
+                  </span>
+                  <span className="text-[11px] text-[#B8C6D8] block">
+                    Use system hardware biometrics to unlock your vault quickly on this device
+                  </span>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={enableBiometrics}
+                onChange={(e) => setEnableBiometrics(e.target.checked)}
+                disabled={isInitializing}
+                className="w-4 h-4 rounded border-[#1D3855] bg-[#03152F] text-[#08BBD4] focus:ring-[#08BBD4] shrink-0"
+              />
+            </label>
+          )}
 
           {error && (
             <div className="p-3 rounded-xl bg-[#D64545]/15 border border-[#D64545]/40 text-xs text-[#D64545]">

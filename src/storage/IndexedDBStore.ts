@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export interface IndexedDBRecordEnvelope {
+export interface IndexedDBRecordEnvelope<T = unknown> {
   key: string;
-  value: any;
+  value: T;
   updatedAt: number;
   sizeEstimateBytes: number;
 }

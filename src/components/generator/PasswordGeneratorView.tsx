@@ -215,20 +215,22 @@ export const PasswordGeneratorView: React.FC<PasswordGeneratorViewProps> = ({
 
             {/* Character Set Checkboxes */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-              {[
-                { key: 'uppercase', label: 'Uppercase (A-Z)' },
-                { key: 'lowercase', label: 'Lowercase (a-z)' },
-                { key: 'numbers', label: 'Numbers (0-9)' },
-                { key: 'symbols', label: 'Symbols (!@#$%^&*)' },
-                { key: 'excludeAmbiguous', label: 'Exclude Ambiguous (i, l, 1, O, 0)' },
-              ].map((item) => (
+              {(
+                [
+                  { key: 'uppercase', label: 'Uppercase (A-Z)' },
+                  { key: 'lowercase', label: 'Lowercase (a-z)' },
+                  { key: 'numbers', label: 'Numbers (0-9)' },
+                  { key: 'symbols', label: 'Symbols (!@#$%^&*)' },
+                  { key: 'excludeAmbiguous', label: 'Exclude Ambiguous (i, l, 1, O, 0)' },
+                ] as const
+              ).map((item) => (
                 <label
                   key={item.key}
                   className="flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-bg-secondary/60 cursor-pointer select-none transition-colors"
                 >
                   <input
                     type="checkbox"
-                    checked={(pwOptions as any)[item.key]}
+                    checked={pwOptions[item.key]}
                     onChange={(e) =>
                       setPwOptions({
                         ...pwOptions,

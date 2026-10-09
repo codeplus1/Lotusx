@@ -16,14 +16,6 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
 }) => {
   const [progress, setProgress] = useState(0);
   const [visible, setVisible] = useState(true);
-  const [avatarSrc, setAvatarSrc] = useState('/newprofile.png');
-  const [fallbackIndex, setFallbackIndex] = useState(0);
-
-  const fallbackPaths = [
-    '/Newprofile.png',
-    '/profile.png',
-    '/Profile.png',
-  ];
 
   useEffect(() => {
     const startTime = performance.now();
@@ -71,13 +63,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
             {/* Inner vibrant cyan ring */}
             <div className="w-full h-full rounded-full border-[2.5px] border-[#08BBD4] bg-[#062A63] overflow-hidden flex items-center justify-center shadow-inner">
               <img
-                src={avatarSrc}
-                onError={() => {
-                  if (fallbackIndex < fallbackPaths.length) {
-                    setAvatarSrc(fallbackPaths[fallbackIndex]);
-                    setFallbackIndex((prev) => prev + 1);
-                  }
-                }}
+                src="/newprofile.png"
                 alt="Profile Avatar"
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover object-[center_8%] rounded-full"

@@ -56,12 +56,13 @@ export class BackupService implements IBackupService {
     if (Array.isArray(obj)) {
       return obj.map((item) => this.sanitizeObjectKeys(item)) as unknown as T;
     }
-    const clean: Record<string, any> = Object.create(null);
-    for (const key of Object.keys(obj as Record<string, any>)) {
+    const clean: Record<string, unknown> = Object.create(null);
+    const source = obj as Record<string, unknown>;
+    for (const key of Object.keys(source)) {
       if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
         continue;
       }
-      clean[key] = this.sanitizeObjectKeys((obj as Record<string, any>)[key]);
+      clean[key] = this.sanitizeObjectKeys(source[key]);
     }
     return clean as T;
   }
@@ -70,7 +71,7 @@ export class BackupService implements IBackupService {
    * Safely migrates and validates versioned backup format.
    * Never silently interprets incompatible or unknown formats.
    */
-  migrateBackupEnvelope(rawEnvelope: any): EncryptedBackupEnvelope {
+  migrateBackupEnvelope(rawEnvelope: unknown): EncryptedBackupEnvelope {
     if (!rawEnvelope || typeof rawEnvelope !== 'object') {
       throw new BackupIntegrityError('Malformed backup object: envelope must be a valid JSON object.');
     }
@@ -373,7 +374,7 @@ export class BackupService implements IBackupService {
     try {
       const raw = JSON.parse(backupJson);
       envelope = this.migrateBackupEnvelope(raw);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof BackupIntegrityError) throw err;
       throw new BackupIntegrityError('Backup file is malformed JSON.');
     }
@@ -512,11 +513,7 @@ export class BackupService implements IBackupService {
       verificationToken: envelope.verificationToken,
     };
 
-    const storage = (this.repo as any).storage;
-    if (storage) {
-      await storage.setItem(STORAGE_KEYS.METADATA, metadata);
-      await storage.setItem(STORAGE_KEYS.RECORDS, envelope.records);
-    }
+    await this.repo.replaceSnapshot(metadata, envelope.records);
 
     this.repo.setActiveKey(vaultKey, hkdfKey);
 

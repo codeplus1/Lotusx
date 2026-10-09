@@ -18,7 +18,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useVault } from '../../context/VaultContext';
-import { CATEGORY_METADATA, VaultRecord } from '../../types/vault';
+import { CATEGORY_METADATA, SortOption, VaultRecord } from '../../types/vault';
 
 const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -134,7 +134,7 @@ export const RecordListView: React.FC = () => {
             <span className="text-[11px] text-text-secondary font-medium">Sort:</span>
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
               className="bg-transparent text-xs font-semibold text-text-primary focus:outline-none cursor-pointer flex-1 sm:flex-initial"
             >
               <option value="updated_desc">Recently Updated</option>

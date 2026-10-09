@@ -20,6 +20,7 @@ import { secureStorageService } from '../storage/SecureStorageService';
 import { clipboardService } from '../security/ClipboardService';
 import { passwordChangeDetectionService } from '../security/PasswordChangeDetectionService';
 import { passwordHealthService } from '../security/PasswordHealthService';
+import { biometricService } from '../security/BiometricService';
 import { useBackHandler } from '../hooks/useBackHandler';
 
 export type AppView =
@@ -765,6 +766,7 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const wipeVault = async () => {
+    biometricService.disableBiometricUnlock();
     await vaultRepository.wipeVault();
     setCryptoKey(null);
     setRecords([]);
@@ -817,6 +819,7 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const success = await vaultRepository.changeMasterPassword(oldPassword, newPassword);
       if (success) {
+        await biometricService.handleMasterPasswordRotated(newPassword);
         const updatedMeta = await vaultRepository.getMetadata();
         setMetadata(updatedMeta);
       }

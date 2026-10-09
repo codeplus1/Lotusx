@@ -44,8 +44,10 @@ export const EmergencyRecoveryKitModal: React.FC<EmergencyRecoveryKitModalProps>
     try {
       const data = await emergencyKitService.generateKit(password);
       setKitData(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to generate Emergency Recovery Kit.');
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to generate Emergency Recovery Kit.'
+      );
     } finally {
       setIsGenerating(false);
     }

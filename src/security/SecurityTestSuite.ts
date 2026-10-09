@@ -13,6 +13,7 @@ import { SearchService } from '../storage/SearchService';
 import { VaultRecord, EncryptedPayload } from '../types/vault';
 import { analyzeVaultRecords } from '../components/security/SecurityCenterView';
 import { RecoveryKitService, recoveryKitService } from '../services/RecoveryKitService';
+import { biometricService } from './BiometricService';
 import { DEFAULT_THEME_CONFIG, THEME_STORAGE_KEY } from '../types/theme';
 import {
   VaultIntegrityError,
@@ -1440,6 +1441,78 @@ export class SecurityTestSuite {
           passed: true,
           message: 'Storage optimization and multi-engine safety verified with 100% data fidelity.',
         };
+      }
+    );
+
+    // 28. WebAuthn Biometric Unlock Cryptographic Key Wrapping & Persistence
+    await runTest(
+      'webauthn-biometric-key-wrapping',
+      'WebAuthn Biometric Unlock Cryptographic Key Wrapping & Storage Safety',
+      'Crypto',
+      async () => {
+        const storage = new LocalSecureStorageService();
+        const existingBio = localStorage.getItem('lotusx_webauthn_biometric_v1');
+
+        try {
+          // Verify platform label detection works
+          const label = biometricService.getPlatformBiometricLabel();
+          if (!label || typeof label !== 'string') {
+            return { passed: false, message: 'Biometric platform label detection returned empty string!' };
+          }
+
+          // Simulate encrypted biometric metadata and verify SecureStorageService does not purge it during storage optimization
+          const dummyKey = await window.crypto.subtle.generateKey(
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt', 'decrypt']
+          );
+          const wrappedSecret = await encryptionService.encryptString('TestMasterSecret!2026', dummyKey);
+          const mockMeta = {
+            enabled: true,
+            credentialIdBase64: window.btoa('mock-cred-id-12345'),
+            prfSaltBase64: window.btoa('mock-prf-salt-1234567890123456'),
+            wrappedSecret,
+            wrapMode: 'prf' as const,
+            deviceLabel: 'Test Biometric Sensor',
+            createdAt: Date.now(),
+          };
+
+          localStorage.setItem('lotusx_webauthn_biometric_v1', JSON.stringify(mockMeta));
+
+          if (!biometricService.isBiometricEnabled()) {
+            return { passed: false, message: 'BiometricService failed to detect enabled metadata!' };
+          }
+
+          // Ensure storage migration / optimization preserves WebAuthn enrollment metadata
+          await storage.optimizeStorage();
+
+          if (!biometricService.isBiometricEnabled()) {
+            return {
+              passed: false,
+              message: 'SecureStorageService erroneously purged WebAuthn biometric enrollment metadata!',
+            };
+          }
+
+          const decrypted = await encryptionService.decryptString(
+            biometricService.getMetadata()!.wrappedSecret,
+            dummyKey
+          );
+          if (decrypted !== 'TestMasterSecret!2026') {
+            return { passed: false, message: 'Wrapped biometric secret failed round-trip AES-256-GCM decryption!' };
+          }
+
+          return {
+            passed: true,
+            message: 'WebAuthn biometric key wrapping and storage persistence verified.',
+            details: `Sensor Label: ${label}, Encryption: AES-256-GCM`,
+          };
+        } finally {
+          if (existingBio) {
+            localStorage.setItem('lotusx_webauthn_biometric_v1', existingBio);
+          } else {
+            localStorage.removeItem('lotusx_webauthn_biometric_v1');
+          }
+        }
       }
     );
 

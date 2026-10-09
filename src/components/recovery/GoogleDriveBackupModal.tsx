@@ -62,10 +62,10 @@ export const GoogleDriveBackupModal: React.FC<GoogleDriveBackupModalProps> = ({
       if (list.length > 0 && !selectedFileId) {
         setSelectedFileId(list[0].id);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setStatusMessage({
         type: 'error',
-        text: err.message || 'Failed to fetch backups from Google Drive.',
+        text: err instanceof Error ? err.message : 'Failed to fetch backups from Google Drive.',
       });
     } finally {
       setIsLoadingBackups(false);
@@ -90,10 +90,10 @@ export const GoogleDriveBackupModal: React.FC<GoogleDriveBackupModalProps> = ({
       await googleDriveService.authenticate();
       setIsConnected(true);
       await fetchBackups();
-    } catch (err: any) {
+    } catch (err: unknown) {
       setStatusMessage({
         type: 'error',
-        text: err.message || 'Google Drive authentication failed.',
+        text: err instanceof Error ? err.message : 'Google Drive authentication failed.',
       });
     } finally {
       setIsAuthenticating(false);
@@ -129,10 +129,13 @@ export const GoogleDriveBackupModal: React.FC<GoogleDriveBackupModalProps> = ({
       });
       setBackupPassword('');
       await fetchBackups();
-    } catch (err: any) {
+    } catch (err: unknown) {
       setStatusMessage({
         type: 'error',
-        text: err.message || 'Failed to upload encrypted backup to Google Drive.',
+        text:
+          err instanceof Error
+            ? err.message
+            : 'Failed to upload encrypted backup to Google Drive.',
       });
     } finally {
       setIsUploading(false);
@@ -156,10 +159,13 @@ export const GoogleDriveBackupModal: React.FC<GoogleDriveBackupModalProps> = ({
       if (onRestoreSuccess) {
         onRestoreSuccess(result.recordCount);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setStatusMessage({
         type: 'error',
-        text: err.message || 'Failed to restore backup. Please verify your backup password.',
+        text:
+          err instanceof Error
+            ? err.message
+            : 'Failed to restore backup. Please verify your backup password.',
       });
     } finally {
       setIsRestoring(false);

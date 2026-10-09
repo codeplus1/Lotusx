@@ -20,7 +20,7 @@ const SENSITIVE_PATTERNS = [
   /[?&](password|key|token|secret|recovery)=[^&#\s]+/gi,
 ];
 
-export function sanitizeSensitiveData(input: any): any {
+export function sanitizeSensitiveData(input: unknown): any {
   if (input === null || input === undefined) return input;
 
   if (typeof input === 'string') {
@@ -32,10 +32,10 @@ export function sanitizeSensitiveData(input: any): any {
   }
 
   if (input instanceof Error) {
-    const cleanError = new Error(sanitizeSensitiveData(input.message));
+    const cleanError = new Error(String(sanitizeSensitiveData(input.message)));
     cleanError.name = input.name;
     if (input.stack) {
-      cleanError.stack = sanitizeSensitiveData(input.stack);
+      cleanError.stack = String(sanitizeSensitiveData(input.stack));
     }
     return cleanError;
   }
@@ -45,8 +45,9 @@ export function sanitizeSensitiveData(input: any): any {
   }
 
   if (typeof input === 'object') {
-    const copy: Record<string, any> = {};
-    for (const key of Object.keys(input)) {
+    const record = input as Record<string, unknown>;
+    const copy: Record<string, unknown> = {};
+    for (const key of Object.keys(record)) {
       const lowerKey = key.toLowerCase();
       if (
         lowerKey.includes('password') ||
@@ -59,7 +60,7 @@ export function sanitizeSensitiveData(input: any): any {
       ) {
         copy[key] = '[REDACTED_SECRET]';
       } else {
-        copy[key] = sanitizeSensitiveData(input[key]);
+        copy[key] = sanitizeSensitiveData(record[key]);
       }
     }
     return copy;
@@ -69,17 +70,17 @@ export function sanitizeSensitiveData(input: any): any {
 }
 
 export class SafeLogger {
-  static log(...args: any[]): void {
+  static log(...args: unknown[]): void {
     const sanitized = args.map(sanitizeSensitiveData);
     console.log(...sanitized);
   }
 
-  static warn(...args: any[]): void {
+  static warn(...args: unknown[]): void {
     const sanitized = args.map(sanitizeSensitiveData);
     console.warn(...sanitized);
   }
 
-  static error(...args: any[]): void {
+  static error(...args: unknown[]): void {
     const sanitized = args.map(sanitizeSensitiveData);
     console.error(...sanitized);
   }

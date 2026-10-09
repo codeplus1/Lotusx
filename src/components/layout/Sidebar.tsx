@@ -87,7 +87,11 @@ export const Sidebar: React.FC = () => {
     }
   }, [isAdvancedActive]);
 
-  const categoryShortcuts: { id: RecordCategory; label: string; icon: any }[] = [
+  const categoryShortcuts: {
+    id: RecordCategory;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }[] = [
     { id: 'passwords', label: 'Passwords', icon: Key },
     { id: 'banking', label: 'Banking', icon: Landmark },
     { id: 'cards', label: 'Cards', icon: CreditCard },

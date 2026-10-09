@@ -112,10 +112,10 @@ export const SettingsView: React.FC = () => {
         type: 'success',
         msg: 'Biometric unlock enabled! You can now unlock LotusX with Fingerprint or Face ID.',
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       setBiometricStatus({
         type: 'error',
-        msg: err.message || 'Failed to enroll biometric credential.',
+        msg: err instanceof Error ? err.message : 'Failed to enroll biometric credential.',
       });
     } finally {
       setIsEnrollingBiometric(false);
@@ -141,6 +141,7 @@ export const SettingsView: React.FC = () => {
     setIsRotating(false);
 
     if (res.success) {
+      setBiometricMeta(biometricService.getMetadata());
       setRotateStatus({
         type: 'success',
         msg: 'Master password rotated & vault re-encrypted with fresh salt and 600,000 PBKDF2 rounds.',
@@ -166,8 +167,11 @@ export const SettingsView: React.FC = () => {
         msg: 'Encrypted .vault backup downloaded successfully.',
       });
       setBackupPw('');
-    } catch (err: any) {
-      setBackupStatus({ type: 'error', msg: err.message || 'Export failed.' });
+    } catch (err: unknown) {
+      setBackupStatus({
+        type: 'error',
+        msg: err instanceof Error ? err.message : 'Export failed.',
+      });
     } finally {
       setIsExporting(false);
     }
@@ -187,8 +191,11 @@ export const SettingsView: React.FC = () => {
         msg: `Successfully restored ${res.recordCount} records! Please re-unlock your vault.`,
       });
       setTimeout(() => window.location.reload(), 1500);
-    } catch (err: any) {
-      setBackupStatus({ type: 'error', msg: err.message || 'Decryption failed.' });
+    } catch (err: unknown) {
+      setBackupStatus({
+        type: 'error',
+        msg: err instanceof Error ? err.message : 'Decryption failed.',
+      });
     } finally {
       setIsRestoring(false);
     }
@@ -207,8 +214,8 @@ export const SettingsView: React.FC = () => {
 
       const count = await importMultipleRecords(parsed);
       setImportStatus(`Imported and encrypted ${count} records into your vault.`);
-    } catch (err: any) {
-      setImportStatus(`Import error: ${err.message}`);
+    } catch (err: unknown) {
+      setImportStatus(`Import error: ${err instanceof Error ? err.message : 'Invalid file format'}`);
     }
   };
 
