@@ -11,7 +11,6 @@ import {
   ShieldCheck,
   Sliders,
   KeyRound,
-  Sparkles,
 } from 'lucide-react';
 import {
   passwordGenerator,
@@ -69,25 +68,6 @@ export const PasswordGeneratorView: React.FC<PasswordGeneratorViewProps> = ({
 
   return (
     <div className={isModal ? 'space-y-5' : 'max-w-3xl mx-auto space-y-6'}>
-      {!isModal && (
-        <div className="bg-bg-surface p-6 rounded-xl border border-border shadow-xs">
-          <div className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-primary font-semibold mb-1">
-            <Sparkles className="w-3.5 h-3.5" />
-            Web Crypto CSPRNG Engine
-          </div>
-          <h1 className="text-2xl font-bold text-text-primary tracking-tight">
-            Cryptographic Secret Generator
-          </h1>
-          <p className="text-xs text-text-secondary mt-1">
-            Generates high-entropy passwords and EFF-inspired passphrases using rejection-sampled{' '}
-            <code className="font-mono bg-bg-secondary px-1.5 py-0.5 rounded text-text-primary">
-              crypto.getRandomValues()
-            </code>{' '}
-            with zero modulo bias.
-          </p>
-        </div>
-      )}
-
       <div className="bg-bg-surface p-6 rounded-xl border border-border shadow-xs space-y-6">
         {/* Mode Switcher */}
         <div className="grid grid-cols-2 gap-2 p-1 bg-bg-secondary rounded-xl border border-border">

@@ -12,6 +12,7 @@ import {
   DetectedPasswordChange,
   SecurityScoreReport,
   SortOption,
+  CATEGORY_METADATA,
 } from '../types/vault';
 import { VaultStatus } from '../types/auth';
 import { DEFAULT_SETTINGS, STORAGE_KEYS } from '../core/constants';
@@ -426,23 +427,43 @@ export const VaultProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      list = list.filter(
-        (r) =>
-          r.title.toLowerCase().includes(q) ||
-          (r.username && r.username.toLowerCase().includes(q)) ||
-          (r.email && r.email.toLowerCase().includes(q)) ||
-          (r.website && r.website.toLowerCase().includes(q)) ||
-          (r.url && r.url.toLowerCase().includes(q)) ||
-          (r.bankName && r.bankName.toLowerCase().includes(q)) ||
-          (r.issuingBank && r.issuingBank.toLowerCase().includes(q)) ||
-          (r.cardholderName && r.cardholderName.toLowerCase().includes(q)) ||
-          (r.accountHolderName && r.accountHolderName.toLowerCase().includes(q)) ||
-          (r.identityDetails?.fullName && r.identityDetails.fullName.toLowerCase().includes(q)) ||
-          (r.identityDetails?.documentType &&
-            r.identityDetails.documentType.toLowerCase().includes(q)) ||
-          (r.wifiDetails?.ssid && r.wifiDetails.ssid.toLowerCase().includes(q))
-      );
+      const terms = searchQuery
+        .toLowerCase()
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+
+      list = list.filter((r) => {
+        const metaLabel = CATEGORY_METADATA[r.category]?.label || '';
+        const searchableFields = [
+          r.title,
+          r.username,
+          r.email,
+          r.website,
+          r.url,
+          r.bankName,
+          r.bankDetails?.bankName,
+          r.issuingBank,
+          r.cardDetails?.issuingBank,
+          r.cardholderName,
+          r.cardDetails?.cardholderName,
+          r.cardNetwork,
+          r.cardDetails?.cardNetwork,
+          r.accountHolderName,
+          r.bankDetails?.accountHolderName,
+          r.identityDetails?.fullName,
+          r.identityDetails?.documentType,
+          r.identityDetails?.issuingAuthority,
+          r.wifiDetails?.ssid,
+          r.notes,
+          metaLabel,
+          ...(r.customFields?.flatMap((cf) => [cf.label, cf.isHidden ? '' : cf.value]) || []),
+        ].filter(Boolean) as string[];
+
+        return terms.every((term) =>
+          searchableFields.some((field) => field.toLowerCase().includes(term))
+        );
+      });
     }
 
     list.sort((a, b) => {

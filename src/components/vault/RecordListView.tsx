@@ -22,21 +22,34 @@ import { CATEGORY_METADATA, SortOption, VaultRecord } from '../../types/vault';
 
 const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const getSearchTerms = (query: string): string[] =>
+  Array.from(
+    new Set(
+      query
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+    )
+  ).sort((a, b) => b.length - a.length);
+
 const highlightMatch = (text: string | undefined, query: string): React.ReactNode => {
   if (!text) return '';
-  const trimmed = query.trim();
-  if (!trimmed) return text;
+  const terms = getSearchTerms(query);
+  if (terms.length === 0) return text;
 
-  const regex = new RegExp(`(${escapeRegExp(trimmed)})`, 'gi');
+  const pattern = terms.map(escapeRegExp).join('|');
+  const regex = new RegExp(`(${pattern})`, 'gi');
   const parts = text.split(regex);
 
   if (parts.length === 1) return text;
 
+  const lowerTerms = new Set(terms.map((t) => t.toLowerCase()));
+
   return parts.map((part, index) =>
-    part.toLowerCase() === trimmed.toLowerCase() ? (
+    lowerTerms.has(part.toLowerCase()) ? (
       <mark
         key={index}
-        className="bg-primary/25 text-text-primary font-semibold rounded-xs px-0.5 border-b border-primary"
+        className="bg-amber-300/80 dark:bg-amber-400/30 text-slate-900 dark:text-amber-100 font-semibold rounded-xs px-1 py-0.5 ring-1 ring-amber-500/40"
       >
         {part}
       </mark>
@@ -44,6 +57,30 @@ const highlightMatch = (text: string | undefined, query: string): React.ReactNod
       part
     )
   );
+};
+
+const createMatchSnippet = (text: string, query: string, maxLength = 72): string => {
+  const cleanText = text.replace(/\s+/g, ' ').trim();
+  if (cleanText.length <= maxLength) return cleanText;
+
+  const terms = getSearchTerms(query);
+  const lower = cleanText.toLowerCase();
+  let matchIndex = -1;
+
+  for (const term of terms) {
+    const idx = lower.indexOf(term.toLowerCase());
+    if (idx !== -1 && (matchIndex === -1 || idx < matchIndex)) {
+      matchIndex = idx;
+    }
+  }
+
+  if (matchIndex <= 20) {
+    return `${cleanText.slice(0, maxLength)}…`;
+  }
+
+  const start = Math.max(0, matchIndex - 20);
+  const slice = cleanText.slice(start, start + maxLength);
+  return `${start > 0 ? '…' : ''}${slice}${start + maxLength < cleanText.length ? '…' : ''}`;
 };
 
 export const RecordListView: React.FC = () => {
@@ -181,7 +218,7 @@ export const RecordListView: React.FC = () => {
               const isSelected = selectedRecord?.id === rec.id;
               const isCopied = copiedFieldLabel === `quick-${rec.id}`;
               const isWeak = rec.password && (rec.strengthScore ?? 3) <= 1;
-              const q = searchQuery.trim().toLowerCase();
+              const searchTerms = getSearchTerms(searchQuery);
 
               const rawCardNum = (rec.cardNumber || rec.cardDetails?.cardNumber || '').replace(
                 /\D/g,
@@ -202,30 +239,55 @@ export const RecordListView: React.FC = () => {
                 ? `SSID: ${rec.wifiDetails.ssid}`
                 : undefined;
 
-              const matchedSecondaryField = q
-                ? [
-                    rec.username,
-                    rec.email,
-                    rec.bankName,
-                    rec.issuingBank,
-                    rec.cardholderName,
-                    rec.identityDetails?.fullName,
-                    rec.wifiDetails?.ssid,
-                    rec.url,
-                    rec.website,
-                  ].find((f) => f && f.toLowerCase().includes(q))
-                : undefined;
-              const secondaryText =
-                matchedSecondaryField ||
-                maskedCardSummary ||
-                wifiSummary ||
-                identitySummary ||
-                rec.username ||
-                rec.email ||
-                rec.bankName ||
-                rec.url ||
-                rec.website ||
-                meta.label;
+              const candidateFields: Array<{ label: string; value?: string; isSnippet?: boolean }> = [
+                { label: 'Username', value: rec.username },
+                { label: 'Email', value: rec.email },
+                { label: 'Bank', value: rec.bankName || rec.bankDetails?.bankName || rec.issuingBank || rec.cardDetails?.issuingBank },
+                { label: 'Cardholder', value: rec.cardholderName || rec.cardDetails?.cardholderName },
+                { label: 'Account Holder', value: rec.accountHolderName || rec.bankDetails?.accountHolderName },
+                { label: 'Network', value: rec.cardNetwork || rec.cardDetails?.cardNetwork },
+                { label: 'Identity', value: identitySummary || rec.identityDetails?.fullName || rec.identityDetails?.documentType },
+                { label: 'Authority', value: rec.identityDetails?.issuingAuthority },
+                { label: 'Wi-Fi', value: wifiSummary || rec.wifiDetails?.ssid },
+                { label: 'Website', value: rec.url || rec.website },
+                ...(rec.customFields?.map((cf) => ({
+                  label: cf.label || 'Field',
+                  value: cf.isHidden ? cf.label : `${cf.label}: ${cf.value}`,
+                })) || []),
+                { label: 'Notes', value: rec.notes, isSnippet: true },
+                { label: 'Category', value: meta.label },
+              ];
+
+              const matchedEntry =
+                searchTerms.length > 0
+                  ? candidateFields.find(
+                      (entry) =>
+                        entry.value &&
+                        searchTerms.some((term) =>
+                          entry.value!.toLowerCase().includes(term.toLowerCase())
+                        )
+                    )
+                  : undefined;
+
+              const secondaryText = matchedEntry?.value
+                ? matchedEntry.isSnippet
+                  ? createMatchSnippet(matchedEntry.value, searchQuery)
+                  : matchedEntry.value
+                : maskedCardSummary ||
+                  wifiSummary ||
+                  identitySummary ||
+                  rec.username ||
+                  rec.email ||
+                  rec.bankName ||
+                  rec.bankDetails?.bankName ||
+                  rec.url ||
+                  rec.website ||
+                  meta.label;
+
+              const showMatchedFieldBadge =
+                Boolean(matchedEntry) &&
+                matchedEntry?.label !== 'Category' &&
+                searchTerms.length > 0;
 
               return (
                 <div
@@ -259,7 +321,12 @@ export const RecordListView: React.FC = () => {
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2 text-xs text-text-secondary truncate mt-0.5">
+                      <div className="flex items-center gap-1.5 text-xs text-text-secondary truncate mt-0.5">
+                        {showMatchedFieldBadge && matchedEntry && (
+                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-bg-secondary text-text-secondary border border-border shrink-0">
+                            {matchedEntry.label}
+                          </span>
+                        )}
                         <span className="truncate">
                           {highlightMatch(secondaryText, searchQuery)}
                         </span>

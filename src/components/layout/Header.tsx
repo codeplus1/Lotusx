@@ -97,8 +97,9 @@ export const Header: React.FC = () => {
   const pageTitle = getHeaderPageTitle();
 
   return (
-    <header className="sticky top-0 z-40 bg-[#03152F] border-b border-[#1D3855] text-white">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
+    <>
+      <header className="fixed top-0 inset-x-0 z-40 bg-[#03152F] border-b border-[#1D3855] text-white shadow-md">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
         {/* Left: Back Button (when navigated) OR Drawer Icon (on Dashboard) + Page Name / Brand Identity */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           {status === 'unlocked' && (
@@ -228,7 +229,9 @@ export const Header: React.FC = () => {
             </button>
           )}
         </div>
-      </div>
-    </header>
+        </div>
+      </header>
+      <div className="h-16 shrink-0" aria-hidden="true" />
+    </>
   );
 };

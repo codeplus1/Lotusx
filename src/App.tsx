@@ -294,7 +294,7 @@ const VaultApp: React.FC = () => {
 
   // 3. Unlocked Vault State (Main App)
   return (
-    <div className="min-h-screen bg-bg-app flex flex-col antialiased text-text-primary transition-colors">
+    <div className="h-dvh overflow-hidden bg-bg-app flex flex-col antialiased text-text-primary transition-colors">
       <Header />
 
       <div className="flex-1 flex overflow-hidden">
