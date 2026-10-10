@@ -35,10 +35,13 @@ import {
   UserCheck,
   Globe,
   MapPin,
+  AlertTriangle,
+  Clock,
 } from 'lucide-react';
 import { useVault } from '../../context/VaultContext';
 import { CustomField } from '../../types/vault';
 import { passwordGenerator } from '../../security/PasswordGeneratorService';
+import { PasswordHealthService } from '../../security/PasswordHealthService';
 import { totpService } from '../../security/TotpService';
 
 interface DetailRowProps {
@@ -89,12 +92,14 @@ const DetailRow: React.FC<DetailRowProps> = ({
     <div className="p-4 rounded-xl bg-bg-app border border-border hover:border-primary/40 transition-all group">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 mb-1.5">
-            {icon && <span className="text-text-secondary shrink-0">{icon}</span>}
-            <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">
-              {label}
-            </span>
-            {extraBadge}
+          <div className="mb-1.5">
+            <div className="flex items-center gap-2">
+              {icon && <span className="text-text-secondary shrink-0">{icon}</span>}
+              <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">
+                {label}
+              </span>
+            </div>
+            {extraBadge && <div className="mt-1">{extraBadge}</div>}
           </div>
 
           <div
@@ -245,6 +250,34 @@ export const RecordDetailView: React.FC = () => {
     ? passwordGenerator.evaluateStrength(selectedRecord.password)
     : null;
 
+  const lastUpdatedTimestamp = selectedRecord.updatedAt || selectedRecord.createdAt;
+  const credentialAgeMs = Math.max(0, Date.now() - lastUpdatedTimestamp);
+  const credentialAgeDays = Math.floor(credentialAgeMs / (1000 * 60 * 60 * 24));
+  const isOverNinetyDays = credentialAgeMs > PasswordHealthService.NINETY_DAYS_MS;
+  const isOverOneYear = credentialAgeMs > PasswordHealthService.ONE_YEAR_MS;
+
+  const formatCredentialAge = (days: number): string => {
+    if (days <= 0) return 'Today (< 1 day old)';
+    if (days === 1) return '1 day old';
+    if (days >= 365) {
+      const years = Math.floor(days / 365);
+      const remainingDays = days % 365;
+      return remainingDays > 0
+        ? `${days} days old (${years}y ${remainingDays}d)`
+        : `${days} days old (${years} ${years === 1 ? 'year' : 'years'})`;
+    }
+    return `${days} days old`;
+  };
+
+  const credentialAgeLabel = formatCredentialAge(credentialAgeDays);
+  const hasSecretOrPassword = Boolean(
+    selectedRecord.password ||
+      selectedRecord.wifiDetails?.password ||
+      selectedRecord.pin ||
+      selectedRecord.cardPin ||
+      selectedRecord.cardDetails?.pin
+  );
+
   const handleQuickAddCustomField = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCustomLabel.trim() || isSavingCustomField) return;
@@ -372,6 +405,67 @@ export const RecordDetailView: React.FC = () => {
     >
       {/* Main Details Content */}
       <div className="p-4 sm:p-6 space-y-6">
+        {/* 90-Day Credential Rotation Alert Banner */}
+        {isOverNinetyDays && !selectedRecord.deletedAt && (
+          <div
+            role="alert"
+            className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+              isOverOneYear
+                ? 'bg-error/10 border-error/30 text-error'
+                : 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={`p-2 rounded-lg shrink-0 mt-0.5 ${
+                  isOverOneYear
+                    ? 'bg-error/15 text-error'
+                    : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                }`}
+              >
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h4 className="text-xs font-bold tracking-wide uppercase">
+                    {isOverOneYear
+                      ? 'Critical Credential Age Alert (> 1 Year)'
+                      : 'Password Rotation Alert (> 90 Days)'}
+                  </h4>
+                  <span
+                    className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                      isOverOneYear
+                        ? 'bg-error/20 text-error'
+                        : 'bg-amber-500/20 text-amber-800 dark:text-amber-200'
+                    }`}
+                  >
+                    {credentialAgeDays} days since update
+                  </span>
+                </div>
+                <p className="text-xs opacity-90 leading-relaxed">
+                  This saved credential has not been updated in{' '}
+                  <span className="font-semibold">{credentialAgeDays} days</span> (last updated on{' '}
+                  {new Date(lastUpdatedTimestamp).toLocaleDateString()}). Rotating credentials
+                  every 90 days helps reduce exposure from potential data breaches.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setEditingRecord(selectedRecord)}
+              className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0 ${
+                isOverOneYear
+                  ? 'bg-error text-white hover:opacity-90'
+                  : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+              }`}
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Rotate Now</span>
+            </button>
+          </div>
+        )}
+
         {/* 1. Primary Login & Authentication Section */}
         {hasPrimaryCredentials && (
           <div className="space-y-3">
@@ -414,9 +508,24 @@ export const RecordDetailView: React.FC = () => {
                 onToggleReveal={toggleFieldReveal}
                 copiedFieldLabel={copiedFieldLabel}
                 onCopy={copyToClipboard}
+                extraBadge={
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                      isOverOneYear
+                        ? 'bg-error/15 text-error border border-error/30'
+                        : isOverNinetyDays
+                        ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30'
+                        : 'bg-success/15 text-success border border-success/30'
+                    }`}
+                    title={`Last updated ${new Date(lastUpdatedTimestamp).toLocaleString()}`}
+                  >
+                    <Clock className="w-2.5 h-2.5" />
+                    <span>{credentialAgeLabel}</span>
+                  </span>
+                }
                 subContent={
                   strength ? (
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       <div className="h-1.5 w-full bg-bg-secondary rounded-full overflow-hidden flex gap-1">
                         {[0, 1, 2, 3].map((idx) => (
                           <div
@@ -429,10 +538,17 @@ export const RecordDetailView: React.FC = () => {
                           />
                         ))}
                       </div>
-                      <div className="flex items-center justify-between text-[11px] text-text-muted">
-                        <span>Estimated offline crack resistance:</span>
-                        <span className="font-mono font-semibold text-text-secondary">
-                          {strength.estimatedCrackTime}
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-text-muted">
+                        <span>
+                          Estimated offline crack resistance:{' '}
+                          <span className="font-mono font-semibold text-text-secondary">
+                            {strength.estimatedCrackTime}
+                          </span>
+                        </span>
+                        <span className="inline-flex items-center gap-1 font-mono text-text-secondary">
+                          <Clock className="w-3 h-3 text-text-muted" />
+                          Password age: {credentialAgeLabel}
+                          {isOverNinetyDays ? ' (Rotation recommended)' : ''}
                         </span>
                       </div>
                     </div>
@@ -1029,6 +1145,20 @@ export const RecordDetailView: React.FC = () => {
                   onToggleReveal={toggleFieldReveal}
                   copiedFieldLabel={copiedFieldLabel}
                   onCopy={copyToClipboard}
+                  extraBadge={
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                        isOverOneYear
+                          ? 'bg-error/15 text-error border border-error/30'
+                          : isOverNinetyDays
+                          ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30'
+                          : 'bg-success/15 text-success border border-success/30'
+                      }`}
+                    >
+                      <Clock className="w-2.5 h-2.5" />
+                      <span>{credentialAgeLabel}</span>
+                    </span>
+                  }
                 />
               </div>
             </div>
@@ -1286,6 +1416,31 @@ export const RecordDetailView: React.FC = () => {
           <div className="flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5" />
             <span>Created: {new Date(selectedRecord.createdAt).toLocaleString()}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Clock
+              className={`w-3.5 h-3.5 ${
+                isOverOneYear
+                  ? 'text-error'
+                  : isOverNinetyDays
+                  ? 'text-amber-500'
+                  : 'text-success'
+              }`}
+            />
+            <span>
+              {hasSecretOrPassword ? 'Password Age:' : 'Credential Age:'}{' '}
+              <strong
+                className={
+                  isOverOneYear
+                    ? 'text-error font-semibold'
+                    : isOverNinetyDays
+                    ? 'text-amber-600 dark:text-amber-400 font-semibold'
+                    : 'text-text-secondary font-semibold'
+                }
+              >
+                {credentialAgeLabel}
+              </strong>
+            </span>
           </div>
           <div className="flex items-center gap-1.5">
             <Shield className="w-3.5 h-3.5 text-success" />
